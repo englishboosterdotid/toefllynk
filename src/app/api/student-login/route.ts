@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getCookieOptions } from "@/lib/cookies";
 
 export async function POST(req: Request) {
   try {
@@ -13,7 +14,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Find student by email and access token
     const student = await prisma.studentAccount.findFirst({
       where: {
         buyerEmail: buyerEmail.toLowerCase().trim(),
@@ -27,18 +27,12 @@ export async function POST(req: Request) {
       );
     }
 
-    // Set student token cookie
     const response = NextResponse.redirect(
       new URL("/student/dashboard", req.url)
     );
 
-    response.cookies.set("student_token", student.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-      path: "/",
-    });
+    const cookieOptions = getCookieOptions();
+    response.cookies.set("student_token", student.accessToken, cookieOptions);
 
     return response;
   } catch (error) {
@@ -49,7 +43,6 @@ export async function POST(req: Request) {
   }
 }
 
-// Handle GET for displaying errors
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const error = url.searchParams.get("error");

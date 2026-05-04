@@ -1,7 +1,7 @@
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { cookies } from "next/headers";
+import { setAuthCookie } from "@/lib/cookies";
 
 const JWT_SECRET = process.env.JWT_SECRET || "toefllynk-secret-key-change-in-production";
 
@@ -36,22 +36,13 @@ export async function POST(req: Request) {
       },
     });
 
-    // Create session token
     const token = jwt.sign(
       { userId: user.id, email: user.email, username: user.username, role: user.role },
       JWT_SECRET,
       { expiresIn: "7d" }
     );
 
-    // Set cookie
-    const cookieStore = await cookies();
-    cookieStore.set("auth_token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7,
-      path: "/",
-    });
+    await setAuthCookie(token);
 
     return Response.json({ success: true, message: "Registrasi berhasil" });
   } catch (error) {

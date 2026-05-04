@@ -1,18 +1,12 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { deleteAuthCookie } from "@/lib/cookies";
 
 export async function GET(req: Request) {
-  const cookieStore = await cookies();
-  cookieStore.delete("auth_token");
-  cookieStore.delete("token"); // Also delete old cookie for compatibility
-
+  await deleteAuthCookie();
   return NextResponse.redirect(new URL("/login", req.url));
 }
 
 export async function POST(req: Request) {
-  const cookieStore = await cookies();
-  cookieStore.delete("auth_token");
-  cookieStore.delete("token");
-
+  await deleteAuthCookie();
   return NextResponse.json({ success: true });
 }

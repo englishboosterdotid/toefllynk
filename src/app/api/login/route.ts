@@ -1,7 +1,7 @@
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import * as jwt from "jsonwebtoken";
-import { cookies } from "next/headers";
+import { setAuthCookie } from "@/lib/cookies";
 
 const JWT_SECRET = process.env.JWT_SECRET || "toefllynk-secret-key-change-in-production";
 
@@ -29,18 +29,11 @@ export async function POST(req: Request) {
       { expiresIn: "7d" }
     );
 
-    const cookieStore = await cookies();
-    cookieStore.set("auth_token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-      path: "/",
-    });
+    await setAuthCookie(token);
 
     return Response.json({ success: true, message: "Login berhasil" });
   } catch (error: any) {
-    
+    console.error("Login error:", error);
     return Response.json({ success: false, message: error.message });
   }
 }

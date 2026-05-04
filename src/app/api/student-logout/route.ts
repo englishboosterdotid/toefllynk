@@ -1,30 +1,25 @@
 import { NextResponse } from "next/server";
+import { getCookieOptions } from "@/lib/cookies";
 
 export async function POST(req: Request) {
   const response = NextResponse.redirect(new URL("/student/login", req.url));
 
-  // Clear student token cookie
+  const cookieOptions = getCookieOptions();
   response.cookies.set("student_token", "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    ...cookieOptions,
     maxAge: 0,
-    path: "/",
   });
 
   return response;
 }
 
-// Also support GET for convenience
 export async function GET(req: Request) {
   const response = NextResponse.redirect(new URL("/student/login", req.url));
 
+  const cookieOptions = getCookieOptions();
   response.cookies.set("student_token", "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    ...cookieOptions,
     maxAge: 0,
-    path: "/",
   });
 
   return response;

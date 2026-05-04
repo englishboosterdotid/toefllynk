@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 import { Role } from "@/generated/prisma/enums";
+import { setAuthCookie, deleteAuthCookie } from "@/lib/cookies";
 
 const JWT_SECRET = process.env.JWT_SECRET || "toefllynk-secret-key-change-in-production";
 
@@ -34,13 +35,13 @@ export async function verifyPassword(password: string, hashedPassword: string): 
   return bcrypt.compare(password, hashedPassword);
 }
 
-export function generateToken(userId: string, role: string): string {
-  return jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: "7d" });
+export function generateToken(userId: string, email: string, username: string, role: string): string {
+  return jwt.sign({ userId, email, username, role }, JWT_SECRET, { expiresIn: "7d" });
 }
 
-export function verifyToken(token: string): { userId: string; role: string } | null {
+export function verifyToken(token: string): { userId: string; email: string; username: string; role: string } | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as { userId: string; role: string };
+    return jwt.verify(token, JWT_SECRET) as { userId: string; email: string; username: string; role: string };
   } catch {
     return null;
   }
@@ -104,16 +105,8 @@ export async function login(email: string, password: string): Promise<LoginResul
       return { success: false, error: "Email atau password salah" };
     }
 
-    const token = generateToken(user.id, user.role);
-
-    const cookieStore = await cookies();
-    cookieStore.set("auth_token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-      path: "/",
-    });
+    const token = generateToken(user.id, user.email, user.username, user.role);
+    await setAuthCookie(token);
 
     return {
       success: true,
@@ -165,16 +158,8 @@ export async function register(
       },
     });
 
-    const token = generateToken(user.id, user.role);
-
-    const cookieStore = await cookies();
-    cookieStore.set("auth_token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7,
-      path: "/",
-    });
+    const token = generateToken(user.id, user.email, user.username, user.role);
+    await setAuthCookie(token);
 
     return {
       success: true,
@@ -199,8 +184,7 @@ export async function register(
 }
 
 export async function logout(): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.delete("auth_token");
+  await deleteAuthCookie();
 }
 
 export async function updateProfile(
