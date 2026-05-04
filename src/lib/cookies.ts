@@ -29,15 +29,8 @@ export async function setAuthCookie(token: string) {
 
 export async function deleteAuthCookie() {
   const cookieStore = await cookies();
-  const options = getCookieOptions();
-  cookieStore.delete("auth_token", {
-    path: options.path,
-    domain: options.domain,
-  });
-  cookieStore.delete("token", {
-    path: options.path,
-    domain: options.domain,
-  });
+  cookieStore.delete("auth_token");
+  cookieStore.delete("token");
 }
 
 export async function setStudentCookie(token: string) {
@@ -47,9 +40,5 @@ export async function setStudentCookie(token: string) {
 
 export async function deleteStudentCookie() {
   const cookieStore = await cookies();
-  const options = getCookieOptions();
-  cookieStore.delete("student_token", {
-    path: options.path,
-    domain: options.domain,
-  });
+  cookieStore.delete("student_token");
 }
