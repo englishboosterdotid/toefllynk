@@ -1,0 +1,394 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============ ENUMS ============
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Category {
+  IELTS
+  TOEFL
+  TOEIC
+}
+
+enum ProductType {
+  TOEFL_SIMULATION
+  IELTS_SIMULATION
+  COURSE
+  BUNDLE
+}
+
+enum PackageType {
+  INDIVIDUAL
+  BUNDLE
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum Section {
+  LISTENING
+  STRUCTURE
+  READING
+}
+
+// ============ MODELS ============
+
+model User {
+  id       String  @id @default(cuid())
+  name     String?
+  email    String  @unique
+  password String
+  username String  @unique
+
+  bio      String?
+  whatsapp String?
+  avatar   String?
+  headline String?
+  ctaText  String?
+  role     Role    @default(USER)
+
+  createdAt DateTime @default(now())
+
+  products Product[]
+
+  affiliateLinks         AffiliateEnrollment[] @relation("AffiliateUser")
+  ownedAffiliateProducts AffiliateEnrollment[] @relation("OwnerUser")
+  ownedStudents          StudentAccount[]      @relation("OwnedStudents")
+  studentProfile         StudentAccount?       @relation("StudentUpgradeUser")
+  affiliateConversions   AffiliateConversion[] @relation("AffiliateIncomeUser")
+  ownedConversions       AffiliateConversion[] @relation("AffiliateOwnerUser")
+  auditLogs             AdminAuditLog[]
+}
+
+model Product {
+  id                  String      @id @default(cuid())
+  userId              String
+  title               String
+  description         String?
+  price               Int
+  promoPrice          Int?
+  thumbnail           String?
+  checkoutLink        String?
+  category            String?
+  productType         ProductType @default(TOEFL_SIMULATION)
+  packageType         PackageType?
+  examCredits         Int         @default(1)
+  certificateIncluded Boolean     @default(true)
+  reviewIncluded      Boolean     @default(false)
+  zoomIncluded        Boolean     @default(false)
+  affiliateEnabled    Boolean     @default(false)
+  affiliateCommission Int         @default(10)
+  isArchived          Boolean     @default(false)
+  createdAt           DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  affiliateEnrollments AffiliateEnrollment[]
+  orders               Order[]
+  studentCredits       StudentExamCredit[]
+  examResults          ExamResult[]
+  affiliateClicks      AffiliateClick[]
+
+  @@index([userId])
+  @@index([category])
+  @@index([productType])
+  @@index([isArchived])
+}
+
+model AffiliateEnrollment {
+  id                String   @id @default(cuid())
+  affiliateUserId   String
+  ownerUserId       String
+  productId         String
+  referralCode      String   @unique
+  commissionPercent Int      @default(10)
+  createdAt         DateTime @default(now())
+
+  affiliateUser User    @relation("AffiliateUser", fields: [affiliateUserId], references: [id], onDelete: Cascade)
+  ownerUser     User    @relation("OwnerUser", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  product       Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([affiliateUserId])
+  @@index([ownerUserId])
+  @@index([productId])
+}
+
+model AffiliateClick {
+  id           String   @id @default(cuid())
+  referralCode String
+  productId    String
+  visitorIp    String?
+  clickedAt    DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([referralCode])
+  @@index([clickedAt])
+  @@index([productId])
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  productId     String
+  buyerName     String
+  buyerEmail    String
+  buyerWhatsapp String?
+  referralCode  String?
+  status        OrderStatus @default(PENDING)
+  studentId     String?
+  createdAt     DateTime    @default(now())
+
+  affiliateConversion AffiliateConversion?
+  adminFee            AdminPlatformFee?
+
+  product Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  student StudentAccount? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([productId])
+  @@index([referralCode])
+}
+
+model AffiliateConversion {
+  id               String   @id @default(cuid())
+  referralCode     String
+  orderId          String   @unique
+  affiliateUserId  String
+  ownerUserId      String
+  commissionAmount Int
+  createdAt        DateTime @default(now())
+
+  order         Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  affiliateUser User  @relation("AffiliateIncomeUser", fields: [affiliateUserId], references: [id], onDelete: Cascade)
+  ownerUser     User  @relation("AffiliateOwnerUser", fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@index([affiliateUserId])
+  @@index([ownerUserId])
+  @@index([referralCode])
+  @@index([createdAt])
+}
+
+model AdminPlatformFee {
+  id        String   @id @default(cuid())
+  orderId   String   @unique
+  feeAmount Int
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model StudentAccount {
+  id            String   @id @default(cuid())
+  buyerName     String
+  buyerEmail    String   @unique
+  buyerWhatsapp String?
+  accessToken   String   @unique
+  ownerUserId   String
+  userId        String?  @unique
+  createdAt     DateTime @default(now())
+
+  ownerUser User  @relation("OwnedStudents", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  user      User? @relation("StudentUpgradeUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  credits        StudentExamCredit[]
+  results        ExamResult[]
+  sessionAnswers ExamSessionAnswer[]
+  sessions       ExamSession[]
+  orders         Order[]
+}
+
+model StudentExamCredit {
+  id          String   @id @default(cuid())
+  studentId   String
+  totalCredit Int
+  usedCredit  Int      @default(0)
+  productId   String
+  createdAt   DateTime @default(now())
+
+  student StudentAccount @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  product Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([productId])
+}
+
+model ExamResult {
+  id               String   @id @default(cuid())
+  studentId        String
+  listeningCorrect Int
+  structureCorrect Int
+  readingCorrect   Int
+  totalScore       Int
+  productId        String
+  createdAt        DateTime @default(now())
+
+  student StudentAccount @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  product Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([productId])
+  @@index([createdAt])
+}
+
+model QuestionBank {
+  id             String   @id @default(cuid())
+  section        Section
+  questionNumber Int
+  questionText   String
+  passageText    String?
+  audioUrl       String?
+  correctAnswer  String
+  explanation    String?
+  createdAt      DateTime @default(now())
+
+  options        QuestionOption[]
+  sessionAnswers ExamSessionAnswer[]
+  examAnswers    ExamAnswer[]
+
+  @@index([section])
+}
+
+model QuestionOption {
+  id         String @id @default(cuid())
+  questionId String
+  optionKey  String // A B C D
+  optionText String
+
+  question QuestionBank @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, optionKey])
+}
+
+model ExamSessionAnswer {
+  id          String   @id @default(cuid())
+  studentId   String
+  questionId  String
+  selectedKey String
+  createdAt   DateTime @default(now())
+
+  student  StudentAccount @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  question QuestionBank   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([questionId])
+  @@index([studentId, questionId])
+}
+
+enum SessionStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+model ExamSession {
+  id               String         @id @default(cuid())
+  studentId        String
+  status           SessionStatus  @default(NOT_STARTED)
+  currentSection   String?        // LISTENING, STRUCTURE, READING
+  sectionTimeLeft  Int            @default(0) // seconds left for current section
+  totalElapsedTime Int            @default(0) // total seconds elapsed
+  startedAt       DateTime?
+  completedAt     DateTime?
+  lastActivity     DateTime?
+  progress         Json?          // stores { answers: {}, flaggedQuestions: [], currentQuestion: number }
+  createdAt       DateTime       @default(now())
+
+  student  StudentAccount @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  answers  ExamAnswer[]
+  activityLogs ExamActivityLog[]
+
+  @@index([studentId])
+  @@index([status])
+}
+
+enum ActivityType {
+  TAB_SWITCH
+  FULLSCREEN_EXIT
+  FULLSCREEN_ENTER
+  SECTION_CHANGE
+  AUTO_SUBMIT
+  MANUAL_SUBMIT
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  VIEW
+  EXPORT
+}
+
+model AdminAuditLog {
+  id          String      @id @default(cuid())
+  adminId     String
+  action      AuditAction
+  entityType  String      // e.g., "QuestionBank", "Product", "Order"
+  entityId    String?
+  oldValue    Json?       // For UPDATE/DELETE
+  newValue    Json?       // For CREATE/UPDATE
+  ipAddress   String?
+  userAgent   String?
+  details     String?     // Additional description
+  createdAt   DateTime    @default(now())
+
+  admin User @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([entityType])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model ExamActivityLog {
+  id          String       @id @default(cuid())
+  sessionId   String
+  activityType ActivityType
+  details     Json?        // additional data like warning count, section, etc.
+  createdAt   DateTime     @default(now())
+
+  session ExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([activityType])
+  @@index([createdAt])
+}
+
+model ExamAnswer {
+  id          String   @id @default(cuid())
+  sessionId   String
+  questionId  String
+  selectedKey String
+  isFlagged   Boolean  @default(false)
+  timeSpent   Int      @default(0) // seconds spent on this question
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  session   ExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question  QuestionBank @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, questionId])
+  @@index([sessionId])
+}

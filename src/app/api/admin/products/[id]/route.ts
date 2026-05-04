@@ -1,0 +1,89 @@
+import prisma from "@/lib/prisma";
+import { NextResponse } from "next/server";
+
+export async function GET(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    if (!product) {
+      return NextResponse.json(
+        { success: false, message: "Product not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ success: true, product });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, message: error.message }, { status: 400 });
+  }
+}
+
+export async function PUT(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await req.json();
+
+    const product = await prisma.product.update({
+      where: { id },
+      data: {
+        title: body.title,
+        description: body.description,
+        price: parseInt(body.price),
+        promoPrice: body.promoPrice ? parseInt(body.promoPrice) : null,
+        thumbnail: body.thumbnail,
+        checkoutLink: body.checkoutLink,
+        category: body.category,
+        productType: body.productType,
+        packageType: body.packageType,
+        examCredits: parseInt(body.examCredits) || 1,
+        certificateIncluded: body.certificateIncluded,
+        reviewIncluded: body.reviewIncluded,
+        zoomIncluded: body.zoomIncluded,
+        affiliateEnabled: body.affiliateEnabled,
+        affiliateCommission: parseInt(body.affiliateCommission) || 10,
+        isArchived: body.isArchived,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Product updated successfully",
+      product,
+    });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, message: error.message }, { status: 400 });
+  }
+}
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+
+    await prisma.product.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Product deleted successfully",
+    });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, message: error.message }, { status: 400 });
+  }
+}
