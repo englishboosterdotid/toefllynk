@@ -44,11 +44,23 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
       );
     }
 
-    if (withdrawal.status !== "PENDING") {
-      return NextResponse.json(
-        { error: "This withdrawal request has already been processed" },
-        { status: 400 }
-      );
+    // Validate status based on action
+    if (action === "COMPLETE") {
+      // COMPLETE can only be done on APPROVED status
+      if (withdrawal.status !== "APPROVED") {
+        return NextResponse.json(
+          { error: "Withdrawal must be APPROVED before marking as COMPLETED" },
+          { status: 400 }
+        );
+      }
+    } else {
+      // APPROVE/REJECT can only be done on PENDING status
+      if (withdrawal.status !== "PENDING") {
+        return NextResponse.json(
+          { error: "This withdrawal request has already been processed" },
+          { status: 400 }
+        );
+      }
     }
 
     // Map action to status

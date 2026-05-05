@@ -35,7 +35,7 @@ export async function GET(req: Request) {
 
     // Calculate stats
     const allRequests = await prisma.withdrawalRequest.findMany({
-      select: { status: true, amount: true },
+      select: { status: true, amount: true, netAmount: true },
     });
 
     const pendingCount = allRequests.filter((r) => r.status === "PENDING").length;
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
 
     const totalApprovedAmount = allRequests
       .filter((r) => r.status === "COMPLETED")
-      .reduce((sum, r) => sum + r.amount, 0);
+      .reduce((sum, r) => sum + (r.netAmount || r.amount), 0);
 
     return NextResponse.json({
       success: true,

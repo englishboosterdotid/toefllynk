@@ -19,6 +19,8 @@ interface WithdrawalRequest {
   id: string;
   userId: string;
   amount: number;
+  feeAmount: number | null;
+  netAmount: number | null;
   bankName: string;
   bankAccount: string;
   bankHolder: string;
@@ -245,7 +247,8 @@ export default function AdminWithdrawalsPage() {
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
                 <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3">User</th>
-                <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3">Amount</th>
+                <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3">Pengajuan</th>
+                <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3">Yang Dicairkan</th>
                 <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3">Bank Info</th>
                 <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3">Status</th>
                 <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3">Date</th>
@@ -275,7 +278,13 @@ export default function AdminWithdrawalsPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-lg font-bold text-green-600">{formatCurrency(req.amount)}</p>
+                        <p className="text-sm text-slate-900">{formatCurrency(req.amount)}</p>
+                        {req.feeAmount && req.feeAmount > 0 && (
+                          <p className="text-xs text-slate-400">Fee: {formatCurrency(req.feeAmount)}</p>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-lg font-bold text-green-600">{formatCurrency(req.netAmount || req.amount)}</p>
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-slate-700">{req.bankName}</p>
@@ -372,8 +381,19 @@ export default function AdminWithdrawalsPage() {
               </div>
 
               <div className="bg-slate-50 rounded-xl p-4">
-                <p className="text-sm text-slate-500">Amount</p>
-                <p className="text-2xl font-bold text-green-600">{formatCurrency(selectedRequest.amount)}</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-slate-500">Pengajuan</p>
+                    <p className="text-lg font-bold text-slate-900">{formatCurrency(selectedRequest.amount)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Yang Dicairkan</p>
+                    <p className="text-lg font-bold text-green-600">{formatCurrency(selectedRequest.netAmount || selectedRequest.amount)}</p>
+                  </div>
+                </div>
+                {selectedRequest.feeAmount && selectedRequest.feeAmount > 0 && (
+                  <p className="text-xs text-slate-400 mt-2">Biaya pencairan (1%): {formatCurrency(selectedRequest.feeAmount)}</p>
+                )}
               </div>
 
               <div className="bg-slate-50 rounded-xl p-4">

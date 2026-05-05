@@ -227,7 +227,7 @@ export default function WithdrawalPage() {
           <div className="flex items-center justify-between mb-3">
             <Banknote className="h-5 w-5 opacity-80" />
           </div>
-          <p className="text-lg font-bold">
+          <p className="text-2xl font-black">
             {balanceData ? formatCurrency(balanceData.availableBalance) : "-"}
           </p>
           <p className="text-xs text-green-100 mt-1">Tersedia</p>
@@ -239,7 +239,7 @@ export default function WithdrawalPage() {
               <Wallet className="h-4 w-4 text-blue-600" />
             </div>
           </div>
-          <p className="text-lg font-bold text-slate-900">
+          <p className="text-xl font-bold text-slate-900">
             {balanceData ? formatCurrency(balanceData.grossRevenue) : "-"}
           </p>
           <p className="text-xs text-slate-500 mt-1">Penjualan Gross</p>
@@ -251,7 +251,7 @@ export default function WithdrawalPage() {
               <TrendingUp className="h-4 w-4 text-amber-600" />
             </div>
           </div>
-          <p className="text-lg font-bold text-slate-900">
+          <p className="text-xl font-bold text-slate-900">
             {balanceData ? formatCurrency(balanceData.netOwnSales) : "-"}
           </p>
           <p className="text-xs text-slate-500 mt-1">Penjualan Bersih</p>
@@ -263,7 +263,7 @@ export default function WithdrawalPage() {
               <ArrowDownToLine className="h-4 w-4 text-purple-600" />
             </div>
           </div>
-          <p className="text-lg font-bold text-slate-900">
+          <p className="text-xl font-bold text-slate-900">
             {balanceData ? formatCurrency(balanceData.totalAffiliateEarnings) : "-"}
           </p>
           <p className="text-xs text-slate-500 mt-1">Komisi Affiliate (+)</p>
@@ -275,7 +275,7 @@ export default function WithdrawalPage() {
               <Percent className="h-4 w-4 text-orange-600" />
             </div>
           </div>
-          <p className="text-lg font-bold text-slate-900">
+          <p className="text-xl font-bold text-slate-900">
             {balanceData ? formatCurrency(balanceData.totalAffiliateCommission) : "-"}
           </p>
           <p className="text-xs text-slate-500 mt-1">Komisi Affiliator (-)</p>
@@ -287,7 +287,7 @@ export default function WithdrawalPage() {
               <Banknote className="h-4 w-4 text-red-600" />
             </div>
           </div>
-          <p className="text-lg font-bold text-slate-900">
+          <p className="text-xl font-bold text-slate-900">
             {balanceData ? formatCurrency(balanceData.platformFees) : "-"}
           </p>
           <p className="text-xs text-slate-500 mt-1">Platform Fee (-)</p>
@@ -299,7 +299,7 @@ export default function WithdrawalPage() {
               <Clock className="h-4 w-4 text-amber-600" />
             </div>
           </div>
-          <p className="text-lg font-bold text-slate-900">
+          <p className="text-xl font-bold text-slate-900">
             {balanceData ? formatCurrency(balanceData.pendingAmount) : "-"}
           </p>
           <p className="text-xs text-slate-500 mt-1">Pending (-)</p>
@@ -445,9 +445,9 @@ export default function WithdrawalPage() {
                     value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(e.target.value)}
                     placeholder="50000"
-                    max={balanceData.availableBalance}
                     min="50000"
-                    className="w-full px-4 py-3 rounded-xl text-slate-900 font-semibold"
+                    max={balanceData.availableBalance}
+                    className="w-full px-4 py-3 rounded-xl text-slate-900 font-semibold text-lg"
                     required
                   />
                 </div>
@@ -460,8 +460,24 @@ export default function WithdrawalPage() {
                   Ajukan
                 </button>
               </div>
-              <p className="text-xs text-blue-100 mt-2">
-                Saldo tersedia: {formatCurrency(balanceData.availableBalance)}
+              {withdrawAmount && parseInt(withdrawAmount) >= 50000 && (
+                <div className="mt-4 p-3 bg-white/10 rounded-lg space-y-1">
+                  <div className="flex justify-between text-sm text-blue-200">
+                    <span>Jumlah Penarikan:</span>
+                    <span className="font-medium">{formatCurrency(parseInt(withdrawAmount))}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-blue-200">
+                    <span>Biaya Admin (1%):</span>
+                    <span className="font-medium text-red-300">-{formatCurrency(Math.floor(parseInt(withdrawAmount) * 0.01))}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-white font-bold border-t border-white/20 pt-1 mt-1">
+                    <span>Yang Diterima:</span>
+                    <span>{formatCurrency(Math.floor(parseInt(withdrawAmount) * 0.99))}</span>
+                  </div>
+                </div>
+              )}
+              <p className="text-sm text-blue-100 mt-3 font-medium">
+                Saldo tersedia: <span className="font-bold text-white">{formatCurrency(balanceData.availableBalance)}</span>
               </p>
             </form>
           )}
