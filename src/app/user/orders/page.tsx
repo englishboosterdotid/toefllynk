@@ -81,24 +81,10 @@ export default async function OrdersPage() {
   // Available = Net Own Sales - Sudah Dicairkan - Pending + Affiliate Earnings
   const availableBalance = netOwnSales - totalWithdrawn - pendingAmount + totalAffiliateEarnings;
 
-  // Student stats - count unique students with remaining credits
-  const studentAccounts = await prisma.studentAccount.findMany({
-    where: {
-      ownerUserId: user?.id,
-    },
-    include: {
-      credits: true,
-    },
-  });
-
-  const totalStudents = studentAccounts.length;
-  const activeStudents = studentAccounts.filter((student) => {
-    const remainingCredits = student.credits.reduce(
-      (sum, c) => sum + (c.totalCredit - c.usedCredit),
-      0
-    );
-    return remainingCredits > 0;
-  }).length;
+  // Order stats
+  const totalOrders = orders.length;
+  const completedCount = completedOrders.length;
+  const cancelledCount = cancelledOrders.length;
 
   // Test stats
   const totalTests = completedOrders.reduce(
@@ -238,13 +224,25 @@ export default async function OrdersPage() {
 
         <div className="bg-white rounded-xl border border-slate-100 p-4 flex items-center gap-3">
           <div className="bg-green-100 rounded-lg p-2">
-            <Users className="h-4 w-4 text-green-600" />
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
           </div>
           <div>
             <p className="text-lg font-semibold text-slate-900">
-              {activeStudents}/{totalStudents}
+              {completedCount}
             </p>
-            <p className="text-xs text-slate-500">Active Students</p>
+            <p className="text-xs text-slate-500">Completed</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-100 p-4 flex items-center gap-3">
+          <div className="bg-red-100 rounded-lg p-2">
+            <XCircle className="h-4 w-4 text-red-600" />
+          </div>
+          <div>
+            <p className="text-lg font-semibold text-slate-900">
+              {cancelledCount}
+            </p>
+            <p className="text-xs text-slate-500">Cancelled</p>
           </div>
         </div>
       </div>
