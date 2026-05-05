@@ -16,6 +16,7 @@ import {
   ShoppingCart,
   Award,
   Shield,
+  Wallet,
 } from "lucide-react";
 
 const navItems = [
@@ -23,6 +24,7 @@ const navItems = [
   { label: "Questions", href: "/admin/questions", icon: FileText },
   { label: "Products", href: "/admin/products", icon: Package },
   { label: "Orders", href: "/admin/orders", icon: ShoppingCart },
+  { label: "Withdrawals", href: "/admin/withdrawals", icon: Wallet },
   { label: "Live Monitor", href: "/admin/exam-monitoring", icon: Monitor },
   { label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
   { label: "Leaderboard", href: "/admin/leaderboard", icon: Award },

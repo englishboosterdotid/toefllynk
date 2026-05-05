@@ -20,6 +20,7 @@ import {
   X,
   ChevronLeft,
   Zap,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,7 @@ const navigationGroups: NavGroup[] = [
       { label: "Affiliate Marketplace", href: "/user/affiliate-marketplace", icon: Store },
       { label: "My Affiliate Links", href: "/user/my-affiliate-links", icon: Link2 },
       { label: "Affiliate Earnings", href: "/user/affiliate-earnings", icon: DollarSign },
+      { label: "Withdrawals", href: "/user/withdrawal", icon: Wallet },
       { label: "Referral Analytics", href: "/user/analytics", icon: BarChart3 },
     ],
   },

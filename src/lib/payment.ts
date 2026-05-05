@@ -238,6 +238,7 @@ export async function handleMidtransNotification(
 async function fulfillOrder(order: {
   id: string;
   status: OrderStatus;
+  referralCode: string | null;
   productId: string;
   buyerName: string;
   buyerEmail: string;
@@ -281,13 +282,29 @@ async function fulfillOrder(order: {
   });
 
   // Handle affiliate commission if applicable
-  const enrollment = order.id // referral code is stored in order
-    ? await prisma.affiliateEnrollment.findFirst({
-        where: {
-          referralCode: order.id, // Note: need to add referralCode field to Order
+  if (order.referralCode) {
+    const enrollment = await prisma.affiliateEnrollment.findUnique({
+      where: {
+        referralCode: order.referralCode,
+      },
+    });
+
+    if (enrollment) {
+      const commission = Math.floor(price * (enrollment.commissionPercent / 100));
+
+      await prisma.affiliateConversion.create({
+        data: {
+          referralCode: order.referralCode,
+          orderId: order.id,
+          affiliateUserId: enrollment.affiliateUserId,
+          ownerUserId: enrollment.ownerUserId,
+          commissionAmount: commission,
         },
-      })
-    : null;
+      });
+
+      console.log(`[Midtrans] Affiliate commission created: Rp ${commission} for user ${enrollment.affiliateUserId}`);
+    }
+  }
 
   // Fulfill TOEFL simulation
   if (order.product.productType === ProductType.TOEFL_SIMULATION) {

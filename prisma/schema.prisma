@@ -66,6 +66,11 @@ model User {
   ctaText  String?
   role     Role    @default(USER)
 
+  // Bank info for withdrawals
+  bankName    String?
+  bankAccount String?
+  bankHolder  String?
+
   createdAt DateTime @default(now())
 
   products Product[]
@@ -77,6 +82,8 @@ model User {
   affiliateConversions   AffiliateConversion[] @relation("AffiliateIncomeUser")
   ownedConversions       AffiliateConversion[] @relation("AffiliateOwnerUser")
   auditLogs             AdminAuditLog[]
+  withdrawalRequests    WithdrawalRequest[]
+  processedWithdrawals  WithdrawalRequest[]   @relation("WithdrawalProcessor")
 }
 
 model Product {
@@ -188,13 +195,63 @@ model AffiliateConversion {
   @@index([createdAt])
 }
 
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+enum AdminPlatformFeeStatus {
+  ACTIVE
+  VOIDED
+}
+
 model AdminPlatformFee {
   id        String   @id @default(cuid())
   orderId   String   @unique
   feeAmount Int
+  status    AdminPlatformFeeStatus @default(ACTIVE)
   createdAt DateTime @default(now())
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model WithdrawalRequest {
+  id          String           @id @default(cuid())
+  userId      String
+  amount      Int
+  bankName    String
+  bankAccount String
+  bankHolder  String
+  status      WithdrawalStatus @default(PENDING)
+  notes       String?
+  processedAt DateTime?
+  processedBy String?
+  createdAt   DateTime         @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  admin  User?  @relation("WithdrawalProcessor", fields: [processedBy], references: [id], onDelete: SetNull)
+
+  transactions WithdrawalTransaction[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model WithdrawalTransaction {
+  id            String   @id @default(cuid())
+  withdrawalId  String
+  type          String   // EARNING, WITHDRAWAL, ADJUSTMENT
+  amount        Int
+  description   String?
+  balanceAfter  Int
+  createdAt     DateTime @default(now())
+
+  withdrawal WithdrawalRequest @relation(fields: [withdrawalId], references: [id], onDelete: Cascade)
+
+  @@index([withdrawalId])
 }
 
 model StudentAccount {

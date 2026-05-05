@@ -13,6 +13,8 @@ import {
   Users,
   DollarSign,
   BarChart3,
+  Percent,
+  Calculator,
 } from "lucide-react";
 
 export default async function OrdersPage() {
@@ -27,6 +29,7 @@ export default async function OrdersPage() {
     include: {
       product: true,
       affiliateConversion: true,
+      adminFee: true,
       student: {
         include: {
           credits: true,
@@ -51,7 +54,32 @@ export default async function OrdersPage() {
     (sum, o) => sum + (o.affiliateConversion?.commissionAmount || 0),
     0
   );
-  const netRevenue = totalRevenue - totalAffiliateCommission;
+  const totalPlatformFee = completedOrders.reduce(
+    (sum, o) => sum + (o.adminFee?.feeAmount || 0),
+    0
+  );
+  const netOwnSales = totalRevenue - totalAffiliateCommission - totalPlatformFee;
+
+  // Calculate withdrawals
+  const userWithdrawals = await prisma.withdrawalRequest.findMany({
+    where: { userId: user?.id },
+  });
+  const totalWithdrawn = userWithdrawals
+    .filter((w) => w.status === "COMPLETED")
+    .reduce((sum, w) => sum + w.amount, 0);
+  const pendingAmount = userWithdrawals
+    .filter((w) => w.status === "PENDING")
+    .reduce((sum, w) => sum + w.amount, 0);
+
+  // Get affiliate earnings from other users' products
+  const affiliateEarnings = await prisma.affiliateConversion.aggregate({
+    where: { affiliateUserId: user?.id },
+    _sum: { commissionAmount: true },
+  });
+  const totalAffiliateEarnings = affiliateEarnings._sum.commissionAmount || 0;
+
+  // Available = Net Own Sales - Sudah Dicairkan - Pending + Affiliate Earnings
+  const availableBalance = netOwnSales - totalWithdrawn - pendingAmount + totalAffiliateEarnings;
 
   // Student stats - count unique students with remaining credits
   const studentAccounts = await prisma.studentAccount.findMany({
@@ -95,19 +123,19 @@ export default async function OrdersPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Revenue */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Available Balance */}
         <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-5 text-white">
           <div className="flex items-center justify-between mb-3">
             <DollarSign className="h-6 w-6 opacity-80" />
             <span className="text-xs bg-white/20 px-2 py-1 rounded-full">
-              Net
+              Tersedia
             </span>
           </div>
           <p className="text-2xl font-bold">
-            Rp {netRevenue.toLocaleString("id-ID")}
+            Rp {availableBalance.toLocaleString("id-ID")}
           </p>
-          <p className="text-xs text-green-100 mt-1">Net Revenue</p>
+          <p className="text-xs text-green-100 mt-1">Available</p>
         </div>
 
         {/* Gross Revenue */}
@@ -121,39 +149,52 @@ export default async function OrdersPage() {
             Rp {totalRevenue.toLocaleString("id-ID")}
           </p>
           <p className="text-xs text-slate-500 mt-1">
-            Gross ({completedOrders.length} orders)
+            Gross ({completedOrders.length})
           </p>
+        </div>
+
+        {/* Net Own Sales */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="bg-blue-100 rounded-xl p-2">
+              <DollarSign className="h-5 w-5 text-blue-600" />
+            </div>
+          </div>
+          <p className="text-xl font-bold text-slate-900">
+            Rp {netOwnSales.toLocaleString("id-ID")}
+          </p>
+          <p className="text-xs text-slate-500 mt-1">Penjualan Bersih</p>
+        </div>
+
+        {/* Affiliate Earnings */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="bg-amber-100 rounded-xl p-2">
+              <Percent className="h-5 w-5 text-amber-600" />
+            </div>
+          </div>
+          <p className="text-xl font-bold text-slate-900">
+            Rp {totalAffiliateEarnings.toLocaleString("id-ID")}
+          </p>
+          <p className="text-xs text-slate-500 mt-1">Komisi Affiliate</p>
         </div>
 
         {/* Pending */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5">
           <div className="flex items-center justify-between mb-3">
-            <div className="bg-amber-100 rounded-xl p-2">
-              <Clock className="h-5 w-5 text-amber-600" />
+            <div className="bg-red-100 rounded-xl p-2">
+              <Calculator className="h-5 w-5 text-red-600" />
             </div>
-            {pendingOrders.length > 0 && (
+            {pendingAmount > 0 && (
               <span className="bg-amber-500 text-white text-xs px-2 py-1 rounded-full">
-                {pendingOrders.length}
+                {pendingAmount > 0 ? "!" : ""}
               </span>
             )}
           </div>
           <p className="text-xl font-bold text-slate-900">
-            {pendingOrders.length}
+            Rp {totalPlatformFee.toLocaleString("id-ID")}
           </p>
-          <p className="text-xs text-slate-500 mt-1">Pending Payment</p>
-        </div>
-
-        {/* Students */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <div className="bg-blue-100 rounded-xl p-2">
-              <Users className="h-5 w-5 text-blue-600" />
-            </div>
-          </div>
-          <p className="text-xl font-bold text-slate-900">
-            {activeStudents}/{totalStudents}
-          </p>
-          <p className="text-xs text-slate-500 mt-1">Active Students</p>
+          <p className="text-xs text-slate-500 mt-1">Platform Fee (5%)</p>
         </div>
       </div>
 
@@ -173,35 +214,37 @@ export default async function OrdersPage() {
 
         <div className="bg-white rounded-xl border border-slate-100 p-4 flex items-center gap-3">
           <div className="bg-slate-100 rounded-lg p-2">
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <Clock className="h-4 w-4 text-slate-600" />
           </div>
           <div>
             <p className="text-lg font-semibold text-slate-900">
-              {completedOrders.length}
+              {pendingOrders.length}
             </p>
-            <p className="text-xs text-slate-500">Completed</p>
+            <p className="text-xs text-slate-500">Pending</p>
           </div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-100 p-4 flex items-center gap-3">
-          <div className="bg-slate-100 rounded-lg p-2">
-            <BarChart3 className="h-4 w-4 text-purple-600" />
+          <div className="bg-orange-100 rounded-lg p-2">
+            <Percent className="h-4 w-4 text-orange-600" />
           </div>
           <div>
-            <p className="text-lg font-semibold text-slate-900">{totalTests}</p>
-            <p className="text-xs text-slate-500">Tests Taken</p>
+            <p className="text-lg font-semibold text-slate-900">
+              Rp {totalAffiliateCommission.toLocaleString("id-ID")}
+            </p>
+            <p className="text-xs text-slate-500">Affiliate Commission</p>
           </div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-100 p-4 flex items-center gap-3">
-          <div className="bg-slate-100 rounded-lg p-2">
-            <TrendingUp className="h-4 w-4 text-blue-600" />
+          <div className="bg-green-100 rounded-lg p-2">
+            <Users className="h-4 w-4 text-green-600" />
           </div>
           <div>
             <p className="text-lg font-semibold text-slate-900">
-              {Math.round(avgScore)}
+              {activeStudents}/{totalStudents}
             </p>
-            <p className="text-xs text-slate-500">Avg Score</p>
+            <p className="text-xs text-slate-500">Active Students</p>
           </div>
         </div>
       </div>
