@@ -275,9 +275,11 @@ export function DashboardLayoutClient({ user, children }: DashboardLayoutClientP
           </div>
 
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" className="hidden sm:flex">
-              View Microsite
-            </Button>
+            <Link href={`/${user.username}`} target="_blank">
+              <Button variant="outline" size="sm" className="hidden sm:flex">
+                View Microsite
+              </Button>
+            </Link>
             <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-600" />
           </div>
         </header>

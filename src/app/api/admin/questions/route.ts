@@ -1,29 +1,59 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { Section } from "@/generated/prisma/enums";
+import { requireAdmin } from "@/lib/requireAdmin";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const questions = await prisma.questionBank.findMany({
-      orderBy: [
-        { section: "asc" },
-        { questionNumber: "asc" },
-      ],
-      include: {
-        options: {
-          orderBy: { optionKey: "asc" },
-        },
-      },
-    });
+    await requireAdmin();
+    
+    const { searchParams } = new URL(req.url);
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.max(1, Math.min(100, parseInt(searchParams.get("limit") || "50")));
+    const skip = (page - 1) * limit;
+    const section = searchParams.get("section") as Section | null;
 
-    return NextResponse.json({ success: true, questions });
+    const where = section ? { section } : {};
+
+    const [questions, total] = await Promise.all([
+      prisma.questionBank.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: [
+          { section: "asc" },
+          { questionNumber: "asc" },
+        ],
+        include: {
+          options: {
+            orderBy: { optionKey: "asc" },
+          },
+        },
+      }),
+      prisma.questionBank.count({ where }),
+    ]);
+
+    return NextResponse.json({ 
+      success: true, 
+      questions,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      }
+    });
   } catch (error: any) {
+    if (error.message === "Unauthorized" || error.message === "Admin access required") {
+      return NextResponse.json({ success: false, message: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
+    }
     return NextResponse.json({ success: false, message: error.message }, { status: 400 });
   }
 }
 
 export async function POST(req: Request) {
   try {
+    await requireAdmin();
     const formData = await req.formData();
 
     const question = await prisma.questionBank.create({
@@ -65,6 +95,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, message: "Pertanyaan berhasil disimpan" });
   } catch (error: any) {
+    if (error.message === "Unauthorized" || error.message === "Admin access required") {
+      return NextResponse.json({ success: false, message: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
+    }
     return NextResponse.json({ success: false, message: error.message }, { status: 400 });
   }
 }

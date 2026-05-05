@@ -1,18 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, Loader2, Clock, Mail } from "lucide-react";
+import { CheckCircle2, Loader2, Clock, Mail, AlertCircle } from "lucide-react";
+
+type OrderStatus = "COMPLETED" | "PENDING" | "FAILED" | "EXPIRED";
 
 export default function OrderSuccessClient() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId");
-  const status = searchParams.get("status");
+  const urlStatus = searchParams.get("status");
 
-  const [stage, setStage] = useState<"loading" | "processing" | "success" | "pending">("loading");
+  const [stage, setStage] = useState<"loading" | "processing" | "success" | "pending" | "error">("loading");
+  const stageRef = useRef(stage);
+  stageRef.current = stage;
 
   useEffect(() => {
+    // If URL says success, show immediately
+    if (urlStatus === "success") {
+      setStage("success");
+      return;
+    }
+
     if (!orderId) {
       setStage("pending");
       return;
@@ -22,20 +32,33 @@ export default function OrderSuccessClient() {
     const checkOrderStatus = async () => {
       try {
         const response = await fetch(`/api/order/${orderId}/status`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.status === "COMPLETED") {
-            setStage("success");
-          } else if (data.status === "PENDING") {
-            setStage("processing");
-          } else {
-            setStage("pending");
-          }
-        } else {
-          setStage("processing");
+
+        if (!response.ok) {
+          setStage("error");
+          return;
         }
-      } catch {
-        setStage("processing");
+
+        const data = await response.json();
+        console.log("Order status response:", data);
+
+        if (data.error) {
+          setStage("error");
+          return;
+        }
+
+        const orderStatus = data.status as OrderStatus;
+
+        if (orderStatus === "COMPLETED") {
+          setStage("success");
+        } else if (orderStatus === "PENDING") {
+          setStage("processing");
+        } else {
+          // FAILED, EXPIRED, or unknown
+          setStage("pending");
+        }
+      } catch (err) {
+        console.error("Failed to check order status:", err);
+        setStage("error");
       }
     };
 
@@ -44,21 +67,49 @@ export default function OrderSuccessClient() {
     // Poll every 2 seconds for up to 30 seconds
     let pollCount = 0;
     const pollInterval = setInterval(async () => {
+      // Stop polling if already success
+      if (stageRef.current === "success") {
+        clearInterval(pollInterval);
+        return;
+      }
+
       pollCount++;
       await checkOrderStatus();
 
-      if (stage === "success" || pollCount >= 15) {
+      // If still not success after 15 polls, show pending
+      if (pollCount >= 15 && (stageRef.current as string) !== "success") {
         clearInterval(pollInterval);
-        if (stage !== "success") {
-          setStage("pending");
-        }
+        setStage("pending");
       }
     }, 2000);
 
     return () => clearInterval(pollInterval);
-  }, [orderId, stage]);
+  }, [orderId, urlStatus]);
 
-  if (stage === "pending" || status === "pending") {
+  // Error state
+  if (stage === "error") {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-slate-50 to-red-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-2xl border border-red-200 shadow-xl p-8 text-center">
+          <div className="h-16 w-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="h-8 w-8 text-red-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 mb-3">Terjadi Kesalahan</h1>
+          <p className="text-slate-600 mb-6">
+            Gagal memverifikasi status pesanan. Silakan coba lagi atau hubungi customer service.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium"
+          >
+            Coba Lagi
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  if (stage === "pending" || urlStatus === "pending") {
     return (
       <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-xl p-8 text-center">

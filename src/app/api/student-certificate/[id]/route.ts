@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import QRCode from "qrcode";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { CertificatePDF } from "@/components/CertificatePDF";
+import { getStudentSession } from "@/lib/getStudentSession";
+import { getSession } from "@/lib/session";
 
 export async function GET(
   _req: Request,
@@ -11,15 +13,33 @@ export async function GET(
   try {
     const { id } = await params;
 
+    // Auth check: either student owner or admin/user
+    const student = await getStudentSession();
+    const session = await getSession();
+
+    if (!student && !session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const result = await prisma.examResult.findUnique({
       where: { id },
       include: {
         student: true,
+        product: { select: { userId: true } },
       },
     });
 
     if (!result) {
       return NextResponse.json({ error: "Result not found" }, { status: 404 });
+    }
+
+    // Verify ownership: student owner, product owner, or admin
+    const isStudentOwner = student && result.studentId === student.id;
+    const isProductOwner = session && result.product.userId === session.userId;
+    const isAdmin = session?.role === "ADMIN";
+
+    if (!isStudentOwner && !isProductOwner && !isAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
     // Generate QR code with verification URL

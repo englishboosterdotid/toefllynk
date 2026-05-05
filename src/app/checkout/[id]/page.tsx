@@ -42,6 +42,6 @@ export default async function CheckoutPage({
   };
 
   return (
-    <CheckoutClient product={serializedProduct} ref={ref} />
+    <CheckoutClient product={serializedProduct} referral={ref} />
   );
 }

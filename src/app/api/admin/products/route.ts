@@ -1,24 +1,50 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { ProductType, PackageType } from "@/generated/prisma/enums";
+import { requireAdmin } from "@/lib/requireAdmin";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const products = await prisma.product.findMany({
-      orderBy: { createdAt: "desc" },
-      include: {
-        user: { select: { id: true, name: true, email: true } },
-      },
-    });
+    await requireAdmin();
+    
+    const { searchParams } = new URL(req.url);
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.max(1, Math.min(50, parseInt(searchParams.get("limit") || "20")));
+    const skip = (page - 1) * limit;
 
-    return NextResponse.json({ success: true, products });
+    const [products, total] = await Promise.all([
+      prisma.product.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+        },
+      }),
+      prisma.product.count(),
+    ]);
+
+    return NextResponse.json({ 
+      success: true, 
+      products,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      }
+    });
   } catch (error: any) {
+    if (error.message === "Unauthorized" || error.message === "Admin access required") {
+      return NextResponse.json({ success: false, message: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
+    }
     return NextResponse.json({ success: false, message: error.message }, { status: 400 });
   }
 }
 
 export async function POST(req: Request) {
   try {
+    await requireAdmin();
     const body = await req.json();
     const {
       title,
@@ -99,6 +125,9 @@ export async function POST(req: Request) {
       product,
     });
   } catch (error: any) {
+    if (error.message === "Unauthorized" || error.message === "Admin access required") {
+      return NextResponse.json({ success: false, message: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
+    }
     return NextResponse.json({ success: false, message: error.message }, { status: 400 });
   }
 }

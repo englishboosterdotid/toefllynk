@@ -1,11 +1,13 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/requireAdmin";
 
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireAdmin();
     const { id } = await params;
 
     const question = await prisma.questionBank.findUnique({
@@ -26,6 +28,9 @@ export async function GET(
 
     return NextResponse.json({ success: true, question });
   } catch (error: any) {
+    if (error.message === "Unauthorized" || error.message === "Admin access required") {
+      return NextResponse.json({ success: false, message: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
+    }
     return NextResponse.json(
       { success: false, message: error.message },
       { status: 400 }
@@ -38,6 +43,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireAdmin();
     const { id } = await params;
     const formData = await req.formData();
 
@@ -77,6 +83,9 @@ export async function PUT(
 
     return NextResponse.json({ success: true, message: "Pertanyaan berhasil diupdate" });
   } catch (error: any) {
+    if (error.message === "Unauthorized" || error.message === "Admin access required") {
+      return NextResponse.json({ success: false, message: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
+    }
     return NextResponse.json(
       { success: false, message: error.message },
       { status: 400 }
@@ -89,6 +98,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireAdmin();
     const { id } = await params;
 
     // Delete related options first
@@ -103,6 +113,9 @@ export async function DELETE(
 
     return NextResponse.json({ success: true, message: "Pertanyaan berhasil dihapus" });
   } catch (error: any) {
+    if (error.message === "Unauthorized" || error.message === "Admin access required") {
+      return NextResponse.json({ success: false, message: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
+    }
     return NextResponse.json(
       { success: false, message: error.message },
       { status: 400 }

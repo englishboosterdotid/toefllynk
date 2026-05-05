@@ -1,10 +1,17 @@
 import prisma from "@/lib/prisma";
 import { generateAccessToken } from "@/lib/generateAccessToken";
 import { OrderStatus, ProductType } from "@/generated/prisma/enums";
+import { getSession } from "@/lib/session";
 
 export async function POST(req: Request) {
   const formData = await req.formData();
   const orderId = formData.get("orderId") as string;
+
+  // Verify user is authenticated
+  const session = await getSession();
+  if (!session) {
+    return Response.redirect(new URL("/login", req.url));
+  }
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
@@ -16,6 +23,11 @@ export async function POST(req: Request) {
   });
 
   if (!order) {
+    return Response.redirect(new URL("/user/orders", req.url));
+  }
+
+  // Verify the order belongs to this user or user owns the product
+  if (order.buyerEmail !== session.email && order.product.userId !== session.userId) {
     return Response.redirect(new URL("/user/orders", req.url));
   }
 

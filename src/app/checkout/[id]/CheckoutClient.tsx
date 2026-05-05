@@ -34,10 +34,10 @@ interface Product {
 
 interface CheckoutClientProps {
   product: Product;
-  ref?: string;
+  referral?: string;
 }
 
-export default function CheckoutClient({ product, ref }: CheckoutClientProps) {
+export default function CheckoutClient({ product, referral }: CheckoutClientProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,7 +108,7 @@ export default function CheckoutClient({ product, ref }: CheckoutClientProps) {
           buyerName,
           buyerEmail,
           buyerWhatsapp,
-          referralCode: ref || null,
+          referralCode: referral || null,
         }),
       });
 

@@ -2,6 +2,8 @@ import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Award, ArrowLeft, Download, BarChart3, CheckCircle2, BookOpen, Eye } from "lucide-react";
+import { getStudentSession } from "@/lib/getStudentSession";
+import { getSession } from "@/lib/session";
 
 export default async function StudentResultPage({
   params,
@@ -10,15 +12,50 @@ export default async function StudentResultPage({
 }) {
   const { id } = await params;
 
+  // Auth check
+  const student = await getStudentSession();
+  const session = await getSession();
+
+  if (!student && !session) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-slate-500 mb-4">Silakan login terlebih dahulu</p>
+          <Link href="/student/login" className="text-blue-600 hover:underline">
+            Login Sekarang
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
   const result = await prisma.examResult.findUnique({
     where: { id },
     include: {
       student: true,
-      product: { select: { title: true, thumbnail: true, reviewIncluded: true } },
+      product: { select: { title: true, thumbnail: true, reviewIncluded: true, userId: true } },
     },
   });
 
   if (!result) return notFound();
+
+  // Verify ownership: student owner, product owner, or admin
+  const isStudentOwner = student && result.studentId === student.id;
+  const isProductOwner = session && result.product.userId === session.userId;
+  const isAdmin = session?.role === "ADMIN";
+
+  if (!isStudentOwner && !isProductOwner && !isAdmin) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500">Anda tidak memiliki akses ke hasil ini</p>
+          <Link href="/student/dashboard" className="text-blue-600 hover:underline mt-2 block">
+            Kembali ke Dashboard
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   // Calculate score category
   const getScoreCategory = (score: number) => {

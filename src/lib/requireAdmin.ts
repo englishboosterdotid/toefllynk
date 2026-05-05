@@ -1,22 +1,15 @@
 import { getSession } from "./session";
-import prisma from "./prisma";
 
 export async function requireAdmin() {
-  const session = await getSession();
+  const user = await getSession();
 
-  if (!session) {
+  if (!user) {
     throw new Error("Unauthorized");
   }
 
-  const user = await prisma.user.findUnique({
-    where: {
-      id: session.userId,
-    },
-  });
-
-  if (!user || user.role !== "ADMIN") {
-    throw new Error("Forbidden");
+  if (user.role !== "ADMIN") {
+    throw new Error("Admin access required");
   }
 
-  return user;
+  return { id: user.userId, ...user };
 }

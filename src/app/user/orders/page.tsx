@@ -53,17 +53,23 @@ export default async function OrdersPage() {
   );
   const netRevenue = totalRevenue - totalAffiliateCommission;
 
-  // Student stats
-  const totalStudents = completedOrders.filter(
-    (o) => o.student && o.product.productType !== "BUNDLE"
-  ).length;
-  const activeStudents = completedOrders.filter((o) => {
-    if (!o.student || o.product.productType === "BUNDLE") return false;
-    const credits = o.student.credits.reduce(
+  // Student stats - count unique students with remaining credits
+  const studentAccounts = await prisma.studentAccount.findMany({
+    where: {
+      ownerUserId: user?.id,
+    },
+    include: {
+      credits: true,
+    },
+  });
+
+  const totalStudents = studentAccounts.length;
+  const activeStudents = studentAccounts.filter((student) => {
+    const remainingCredits = student.credits.reduce(
       (sum, c) => sum + (c.totalCredit - c.usedCredit),
       0
     );
-    return credits > 0;
+    return remainingCredits > 0;
   }).length;
 
   // Test stats

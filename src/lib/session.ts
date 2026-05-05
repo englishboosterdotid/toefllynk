@@ -1,7 +1,11 @@
 import { cookies } from "next/headers";
 import * as jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "toefllynk-secret-key-change-in-production";
+const JWT_SECRET = process.env.JWT_SECRET as string;
+
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable is required!");
+}
 
 type SessionUser = {
   userId: string;
@@ -12,7 +16,6 @@ type SessionUser = {
 };
 
 export async function getSession(): Promise<SessionUser | null> {
-  // Try both cookie names for compatibility
   const cookieStore = await cookies();
   const token = cookieStore.get("auth_token")?.value || cookieStore.get("token")?.value;
 

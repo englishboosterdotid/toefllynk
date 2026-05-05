@@ -6,8 +6,14 @@ import {
   sendCertificateReady,
   getProvider,
 } from "@/lib/email";
+import { requireAdmin } from "@/lib/requireAdmin";
 
 export async function GET() {
+  try {
+    await requireAdmin();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const provider = getProvider();
   return NextResponse.json({
     success: true,
@@ -18,6 +24,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    // Require admin auth for email API
+    await requireAdmin();
+
     const body = await req.json();
     const { action, ...data } = body;
 

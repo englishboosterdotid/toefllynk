@@ -1,11 +1,13 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { getAuditLogs, logAudit } from "@/lib/auditLog";
+import { requireAdmin } from "@/lib/requireAdmin";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   try {
+    await requireAdmin();
     const { searchParams } = new URL(req.url);
 
     const params = {
@@ -69,6 +71,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
+    if (error.message === "Unauthorized" || error.message === "Admin access required") {
+      return NextResponse.json({ success: false, message: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
+    }
     console.error("Audit log create error:", error);
     return NextResponse.json(
       { success: false, message: error.message },

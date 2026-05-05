@@ -2,9 +2,19 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createSnapToken } from "@/lib/payment";
 import { createOrder } from "@/lib/services/orderService";
+import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   try {
+    // Apply rate limiting to prevent abuse
+    const rateLimitResult = await rateLimit(req);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const { productId, buyerName, buyerEmail, buyerWhatsapp, referralCode } = body;
 
@@ -12,6 +22,15 @@ export async function POST(req: Request) {
     if (!productId || !buyerName || !buyerEmail) {
       return NextResponse.json(
         { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(buyerEmail)) {
+      return NextResponse.json(
+        { error: "Invalid email format" },
         { status: 400 }
       );
     }
@@ -30,6 +49,14 @@ export async function POST(req: Request) {
 
     // Calculate price
     const amount = product.promoPrice || product.price;
+
+    // Validate amount
+    if (amount < 1000) {
+      return NextResponse.json(
+        { error: "Invalid product price" },
+        { status: 400 }
+      );
+    }
 
     // Create order in pending status
     const orderResult = await createOrder({

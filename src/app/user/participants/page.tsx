@@ -173,19 +173,7 @@ export default async function ParticipantsPage() {
                     </div>
                   </div>
 
-                  <div className="bg-slate-50 rounded-xl p-4 flex items-center justify-between">
-                    <div className="text-sm">
-                      <span className="text-slate-500">Access Token:</span>
-                      <code className="ml-2 text-blue-600 font-mono">{student.accessToken}</code>
-                    </div>
-                    <Link
-                      href={`/user/student-access/${student.id}`}
-                      className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-                    >
-                      Resend Access <ArrowRight className="h-4 w-4" />
-                    </Link>
-                  </div>
-                </div>
+                                  </div>
 
                 {/* Action Suggestions */}
                 <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex gap-3 flex-wrap">

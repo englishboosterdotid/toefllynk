@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/requireUser";
+import { cache, CacheKeys } from "@/lib/cache";
 
 export async function POST(req: Request) {
   try {
@@ -21,6 +22,9 @@ export async function POST(req: Request) {
       where: { id: productId },
       data: { affiliateEnabled: !product.affiliateEnabled },
     });
+    
+    // Invalidate products cache
+    cache.delete(CacheKeys.PRODUCTS);
 
     return NextResponse.redirect(new URL("/user/products", req.url));
   } catch (error: any) {

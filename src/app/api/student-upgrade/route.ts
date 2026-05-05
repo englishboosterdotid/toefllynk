@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { NextResponse } from "next/server";
+import { getStudentSession } from "@/lib/getStudentSession";
 
 export async function POST(req: Request) {
   const formData = await req.formData();
@@ -10,16 +11,27 @@ export async function POST(req: Request) {
   const username = formData.get("username") as string;
   const password = formData.get("password") as string;
 
-  const student = await prisma.studentAccount.findUnique({
+  // Auth check: require student session
+  const student = await getStudentSession();
+  if (!student) {
+    return NextResponse.redirect(new URL("/student/login", req.url));
+  }
+
+  // Verify the student is upgrading their own account
+  if (student.id !== studentId) {
+    return NextResponse.redirect(new URL("/student/dashboard", req.url));
+  }
+
+  const studentAccount = await prisma.studentAccount.findUnique({
     where: { id: studentId },
   });
 
-  if (!student) {
+  if (!studentAccount) {
     return NextResponse.redirect(new URL("/student/dashboard", req.url));
   }
 
   // ALREADY UPGRADED
-  if (student.userId) {
+  if (studentAccount.userId) {
     return NextResponse.redirect(new URL("/student/dashboard", req.url));
   }
 
@@ -34,7 +46,7 @@ export async function POST(req: Request) {
 
   // CHECK EMAIL TAKEN
   const existingEmail = await prisma.user.findUnique({
-    where: { email: student.buyerEmail },
+    where: { email: studentAccount.buyerEmail },
   });
 
   if (existingEmail) {
@@ -46,15 +58,15 @@ export async function POST(req: Request) {
   const user = await prisma.user.create({
     data: {
       username,
-      email: student.buyerEmail,
+      email: studentAccount.buyerEmail,
       password: hashed,
-      whatsapp: student.buyerWhatsapp || null,
-      headline: `Official TOEFL Partner of ${student.buyerName}`,
+      whatsapp: studentAccount.buyerWhatsapp || null,
+      headline: `Official TOEFL Partner of ${studentAccount.buyerName}`,
     },
   });
 
   await prisma.studentAccount.update({
-    where: { id: student.id },
+    where: { id: studentAccount.id },
     data: {
       userId: user.id,
     },
@@ -65,15 +77,19 @@ export async function POST(req: Request) {
       id: user.id,
       email: user.email,
       username: user.username,
+      role: user.role,
     },
     process.env.JWT_SECRET!
   );
 
   const response = NextResponse.redirect(new URL("/user", req.url));
 
-  response.cookies.set("token", token, {
-    path: "/",
+  response.cookies.set("auth_token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
     maxAge: 60 * 60 * 24 * 30,
+    path: "/",
   });
 
   return response;

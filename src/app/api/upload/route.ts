@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { uploadFile, deleteFile, getProvider } from "@/lib/storage";
+import { requireUser } from "@/lib/requireUser";
 
 export async function POST(req: Request) {
   try {
+    await requireUser();
+
     const formData = await req.formData();
     const file = formData.get("file") as File;
     const folder = (formData.get("folder") as string) || "general/";
@@ -14,7 +17,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Validate file size (max 50MB)
     if (file.size > 50 * 1024 * 1024) {
       return NextResponse.json(
         { success: false, message: "File size exceeds 50MB limit" },
@@ -22,7 +24,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Validate file type
     const allowedTypes = [
       "image/jpeg",
       "image/png",
@@ -49,6 +50,12 @@ export async function POST(req: Request) {
 
     return NextResponse.json(result);
   } catch (error: any) {
+    if (error.message === "Unauthorized") {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
     console.error("Upload error:", error);
     return NextResponse.json(
       { success: false, message: error.message || "Upload failed" },
@@ -59,6 +66,8 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
+    await requireUser();
+
     const { searchParams } = new URL(req.url);
     const path = searchParams.get("path");
 
@@ -73,6 +82,12 @@ export async function DELETE(req: Request) {
 
     return NextResponse.json({ success: result });
   } catch (error: any) {
+    if (error.message === "Unauthorized") {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
     console.error("Delete error:", error);
     return NextResponse.json(
       { success: false, message: error.message || "Delete failed" },

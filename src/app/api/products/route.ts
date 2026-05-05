@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/requireUser";
 import { createProduct } from "@/lib/services/productService";
 import { ProductType, PackageType } from "@/generated/prisma/enums";
+import { cache, CacheKeys } from "@/lib/cache";
 
 export async function POST(req: Request) {
   try {
@@ -32,6 +33,9 @@ export async function POST(req: Request) {
       zoomIncluded: zoomIncluded === "true" || zoomIncluded === "on",
       affiliateEnabled: affiliateEnabled === "true" || affiliateEnabled === "on",
     });
+    
+    // Invalidate products cache
+    cache.delete(CacheKeys.PRODUCTS);
 
     return Response.json({ success: true, message: "Produk berhasil dibuat" });
   } catch (error: any) {

@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getAdminUser } from "@/lib/getAdmin";
 import { AdminSidebar, AdminHeader } from "@/components/admin/AdminLayoutClient";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +9,12 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const admin = await getAdminUser();
+
+  if (!admin) {
+    redirect("/login");
+  }
+
   return (
     <div className="min-h-screen bg-slate-50/50">
       <AdminHeader />

@@ -1,10 +1,13 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/requireAdmin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
+  await requireAdmin();
+  
   const { searchParams } = new URL(req.url);
   const sessionId = searchParams.get("sessionId");
 

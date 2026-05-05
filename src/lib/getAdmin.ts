@@ -1,14 +1,7 @@
-import prisma from "./prisma";
-import { getCurrentUser } from "./getUser";
+import { getCurrentUser } from "./services/authService";
 
 export async function getAdminUser() {
-  const session = await getCurrentUser();
-
-  if (!session) return null;
-
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-  });
+  const user = await getCurrentUser();
 
   if (!user || user.role !== "ADMIN") {
     return null;

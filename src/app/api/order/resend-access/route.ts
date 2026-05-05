@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { sendOrderConfirmation } from "@/lib/email";
+import { getSession } from "@/lib/session";
 
 export async function POST(req: Request) {
   try {
+    // Auth check
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const formData = await req.formData();
     const orderId = formData.get("orderId") as string;
 
@@ -26,6 +33,18 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: "Order not found" },
         { status: 404 }
+      );
+    }
+
+    // Verify ownership - buyer or product owner or admin
+    const isBuyer = order.buyerEmail === session.email;
+    const isProductOwner = order.product.userId === session.userId;
+    const isAdmin = session.role === "ADMIN";
+
+    if (!isBuyer && !isProductOwner && !isAdmin) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 403 }
       );
     }
 

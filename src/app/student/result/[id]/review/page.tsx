@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -11,9 +12,9 @@ import {
   BookOpen,
   Eye,
   Volume2,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
 
 type Option = {
   id: string;
@@ -28,13 +29,19 @@ type Question = {
   questionText: string;
   passageText?: string | null;
   audioUrl?: string | null;
-  correctAnswer: string;
   explanation?: string | null;
   options: Option[];
+  correctAnswer: string;
+  userAnswer: string | null;
 };
 
-type Answer = {
-  selectedKey: string;
+type ReviewData = {
+  success: boolean;
+  resultId: string;
+  reviewIncluded: boolean;
+  totalQuestions: number;
+  answeredCount: number;
+  questions: Question[];
 };
 
 export default function ReviewAnswersPage({
@@ -43,9 +50,9 @@ export default function ReviewAnswersPage({
   params: Promise<{ id: string }>;
 }) {
   const [resultId, setResultId] = useState<string | null>(null);
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [answers, setAnswers] = useState<Record<string, Answer>>({});
+  const [reviewData, setReviewData] = useState<ReviewData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [current, setCurrent] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = { current: null as HTMLAudioElement | null };
@@ -57,26 +64,54 @@ export default function ReviewAnswersPage({
   useEffect(() => {
     if (!resultId) return;
 
-    // Fetch questions and student's answers
-    Promise.all([
-      fetch("/api/student-questions").then((res) => res.json()),
-      fetch(`/api/student/exam-session?resultId=${resultId}`)
-        .then((res) => res.json())
-        .catch(() => ({ answers: {} })),
-    ])
-      .then(([qData, aData]) => {
-        if (qData.questions) {
-          setQuestions(qData.questions);
-        }
-        if (aData && "answers" in aData && aData.answers) {
-          setAnswers(aData.answers);
+    fetch(`/api/student/review/${resultId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setReviewData(data);
+        } else {
+          setError(data.error || "Failed to load review");
         }
       })
+      .catch(() => setError("Failed to load review"))
       .finally(() => setLoading(false));
   }, [resultId]);
 
+  if (loading) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="h-12 w-12 rounded-full border-4 border-blue-600 border-t-transparent animate-spin mx-auto mb-4" />
+          <p className="text-slate-500">Memuat review jawaban...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (error || !reviewData) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="h-16 w-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="h-8 w-8 text-red-500" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Tidak Dapat Memuat Review</h2>
+          <p className="text-slate-500 mb-6">{error || "Terjadi kesalahan saat memuat review jawaban"}</p>
+          <Link
+            href={resultId ? `/student/result/${resultId}` : "/student/dashboard"}
+            className="inline-flex items-center gap-2 text-blue-600 hover:underline"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Kembali ke Dashboard
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  const { questions } = reviewData;
   const question = questions[current];
-  const userAnswer = question ? answers[question.id]?.selectedKey : null;
+  const userAnswer = question?.userAnswer;
   const isCorrect = userAnswer === question?.correctAnswer;
 
   const sectionConfig: Record<string, { label: string; color: string; bg: string }> = {
@@ -93,20 +128,9 @@ export default function ReviewAnswersPage({
 
   const getSectionStats = (section: string) => {
     const sectionQs = questionsBySection[section] || [];
-    const correct = sectionQs.filter((q) => answers[q.id]?.selectedKey === q.correctAnswer).length;
+    const correct = sectionQs.filter((q) => q.userAnswer === q.correctAnswer).length;
     return { total: sectionQs.length, correct };
   };
-
-  if (loading) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <div className="h-12 w-12 rounded-full border-4 border-blue-600 border-t-transparent animate-spin mx-auto mb-4" />
-          <p className="text-slate-500">Memuat review jawaban...</p>
-        </div>
-      </main>
-    );
-  }
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -123,7 +147,7 @@ export default function ReviewAnswersPage({
               </Link>
               <div>
                 <h1 className="text-xl font-bold text-slate-900">Review Jawaban</h1>
-                <p className="text-sm text-slate-500">Lihat jawaban Anda dan pembahasannya</p>
+                <p className="text-sm text-slate-500">{reviewData.answeredCount}/{reviewData.totalQuestions} dijawab</p>
               </div>
             </div>
           </div>
@@ -140,7 +164,7 @@ export default function ReviewAnswersPage({
               {Object.entries(questionsBySection).map(([section, qs]) => {
                 const config = sectionConfig[section] || sectionConfig.READING;
                 const stats = getSectionStats(section);
-                const percent = Math.round((stats.correct / stats.total) * 100);
+                const percent = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
 
                 return (
                   <div key={section} className="mb-4">
@@ -162,8 +186,7 @@ export default function ReviewAnswersPage({
                 <h4 className="text-sm font-medium text-slate-700 mb-3">All Questions</h4>
                 <div className="grid grid-cols-5 gap-2">
                   {questions.map((q, idx) => {
-                    const answer = answers[q.id];
-                    const isCorrect = answer?.selectedKey === q.correctAnswer;
+                    const isUserCorrect = q.userAnswer === q.correctAnswer;
                     const isCurrent = idx === current;
 
                     return (
@@ -173,9 +196,11 @@ export default function ReviewAnswersPage({
                         className={`h-8 w-8 rounded-lg text-xs font-medium transition-all flex items-center justify-center ${
                           isCurrent
                             ? "bg-blue-600 text-white shadow-lg"
-                            : isCorrect
+                            : isUserCorrect
                             ? "bg-green-100 text-green-700 border border-green-300"
-                            : "bg-red-100 text-red-700 border border-red-300"
+                            : q.userAnswer
+                            ? "bg-red-100 text-red-700 border border-red-300"
+                            : "bg-slate-100 text-slate-500 border border-slate-200"
                         }`}
                       >
                         {idx + 1}
@@ -193,6 +218,10 @@ export default function ReviewAnswersPage({
                 <div className="flex items-center gap-1.5">
                   <div className="h-3 w-3 rounded bg-red-100 border border-red-300" />
                   <span className="text-slate-500">Salah</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="h-3 w-3 rounded bg-slate-100 border border-slate-200" />
+                  <span className="text-slate-500">Kosong</span>
                 </div>
               </div>
             </div>
@@ -224,17 +253,22 @@ export default function ReviewAnswersPage({
                     </span>
                   </div>
                   <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-                    isCorrect ? "bg-green-500" : "bg-red-500"
+                    isCorrect ? "bg-green-500" : userAnswer ? "bg-red-500" : "bg-slate-500"
                   }`}>
                     {isCorrect ? (
                       <>
                         <CheckCircle2 className="h-5 w-5" />
                         <span className="font-medium">Benar</span>
                       </>
-                    ) : (
+                    ) : userAnswer ? (
                       <>
                         <XCircle className="h-5 w-5" />
                         <span className="font-medium">Salah</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="h-5 w-5" />
+                        <span className="font-medium">Kosong</span>
                       </>
                     )}
                   </div>
@@ -326,10 +360,17 @@ export default function ReviewAnswersPage({
                   </div>
 
                   {/* Your Answer vs Correct */}
-                  {!isCorrect && userAnswer && (
+                  {(!isCorrect && userAnswer) && (
                     <div className="mt-4 p-4 bg-red-50 rounded-xl border border-red-200">
                       <p className="text-sm text-red-800">
                         <strong>Jawaban Anda:</strong> {userAnswer} | <strong>Jawaban yang benar:</strong> {question.correctAnswer}
+                      </p>
+                    </div>
+                  )}
+                  {!userAnswer && (
+                    <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-200">
+                      <p className="text-sm text-amber-800">
+                        <strong>Soal ini tidak dijawab</strong> | <strong>Jawaban yang benar:</strong> {question.correctAnswer}
                       </p>
                     </div>
                   )}

@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { getStudentSession } from "@/lib/getStudentSession";
 import { sendExamResult } from "@/lib/email";
+import { cache, CacheKeys } from "@/lib/cache";
 
 export async function POST(req: Request) {
   const student = await getStudentSession();
@@ -158,6 +159,10 @@ export async function POST(req: Request) {
   }).catch((err) => {
     console.error("Failed to send exam result email:", err);
   });
+  
+  // Invalidate cache since data has changed
+  cache.delete(CacheKeys.LEADERBOARD);
+  cache.delete(CacheKeys.ANALYTICS);
 
   return NextResponse.json({ success: true, resultId: result.id });
 }

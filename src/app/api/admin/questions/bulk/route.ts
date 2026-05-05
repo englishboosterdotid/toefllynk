@@ -1,8 +1,10 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/requireAdmin";
 
 export async function GET(req: Request) {
   try {
+    await requireAdmin();
     const { searchParams } = new URL(req.url);
     const format = searchParams.get("format") || "json";
 
@@ -62,12 +64,16 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ success: true, questions });
   } catch (error: any) {
+    if (error.message === "Unauthorized" || error.message === "Admin access required") {
+      return NextResponse.json({ success: false, message: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
+    }
     return NextResponse.json({ success: false, message: error.message }, { status: 400 });
   }
 }
 
 export async function POST(req: Request) {
   try {
+    await requireAdmin();
     const body = await req.json();
     const { questions, mode = "create" } = body;
 
@@ -148,6 +154,9 @@ export async function POST(req: Request) {
       results,
     });
   } catch (error: any) {
+    if (error.message === "Unauthorized" || error.message === "Admin access required") {
+      return NextResponse.json({ success: false, message: error.message }, { status: error.message === "Unauthorized" ? 401 : 403 });
+    }
     return NextResponse.json({ success: false, message: error.message }, { status: 400 });
   }
 }

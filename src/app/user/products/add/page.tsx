@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { ArrowLeft, Package, DollarSign, Users, Shield, Check, Zap, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -77,14 +77,15 @@ export default function AddProductPage() {
     affiliateEnabled: false,
     commissionPercent: "10",
   });
+  const [isDirty, setIsDirty] = useState(false);
 
   const applyPackagePreset = (type: PackagePreset) => {
     const preset = packagePresets.find((p) => p.type === type);
     if (!preset) return;
 
     setSelectedPreset(type);
-    setForm((prev) => ({
-      ...prev,
+    handleFormChange({
+      ...form,
       examCredits: String(preset.credits),
       certificateIncluded: true,
       reviewIncluded: preset.type !== "BASIC" && preset.type !== "STANDARD",
@@ -92,13 +93,13 @@ export default function AddProductPage() {
       price: preset.price,
       promoPrice: preset.promoPrice,
       commissionPercent: preset.type === "BASIC" ? "10" : preset.type === "STANDARD" ? "12" : preset.type === "PREMIUM" ? "15" : "20",
-    }));
+    });
   };
 
   const applyBundlePreset = () => {
     setSelectedPreset(null);
-    setForm((prev) => ({
-      ...prev,
+    handleFormChange({
+      ...form,
       productType: "TOEFL_SIMULATION",
       packageType: "BUNDLE",
       examCredits: "5",
@@ -108,11 +109,16 @@ export default function AddProductPage() {
       price: "499000",
       promoPrice: "399000",
       commissionPercent: "10",
-    }));
+    });
   };
 
-  const validateForm = () => {
+  const validateForm = useCallback(() => {
     const newErrors: Record<string, string> = {};
+
+    // Validate title (required)
+    if (!form.title.trim()) {
+      newErrors.title = "Nama paket wajib diisi";
+    }
 
     // Validate price
     const price = Number(form.price);
@@ -139,6 +145,21 @@ export default function AddProductPage() {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  }, [form]);
+  
+  // Validate form when it changes, but only after first interaction
+  useEffect(() => {
+    if (isDirty) {
+      validateForm();
+    }
+  }, [validateForm, isDirty]);
+  
+  // Mark form as dirty when user changes any field
+  const handleFormChange = (updatedForm: typeof form) => {
+    setForm(updatedForm);
+    if (!isDirty) {
+      setIsDirty(true);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -262,16 +283,23 @@ export default function AddProductPage() {
             </div>
 
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">Nama Paket *</Label>
-                <Input
-                  id="title"
-                  placeholder="Contoh: Paket Premium TOEFL"
-                  value={form.title}
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  required
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="title">Nama Paket *</Label>
+                  <Input
+                    id="title"
+                    placeholder="Contoh: Paket Premium TOEFL"
+                    value={form.title}
+                    onChange={(e) => handleFormChange({ ...form, title: e.target.value })}
+                    className={cn(errors.title && "border-red-500 focus:border-red-500")}
+                    required
+                  />
+                  {errors.title && (
+                    <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {errors.title}
+                    </p>
+                  )}
+                </div>
 
               <div className="space-y-2">
                 <Label htmlFor="description">Deskripsi</Label>
@@ -281,7 +309,7 @@ export default function AddProductPage() {
                   rows={3}
                   className="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm transition-all focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"
                   value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  onChange={(e) => handleFormChange({ ...form, description: e.target.value })}
                 />
               </div>
 
@@ -297,7 +325,7 @@ export default function AddProductPage() {
                       placeholder="29000"
                       value={form.price}
                       onChange={(e) => {
-                        setForm({ ...form, price: e.target.value });
+                        handleFormChange({ ...form, price: e.target.value });
                         setErrors({ ...errors, price: "" });
                       }}
                       className={cn("pl-12", errors.price && "border-red-500 focus:border-red-500")}
@@ -343,7 +371,7 @@ export default function AddProductPage() {
                   id="category"
                   placeholder="Contoh: Paket Ujicoba, Soal Latihan"
                   value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  onChange={(e) => handleFormChange({ ...form, category: e.target.value })}
                 />
               </div>
 
@@ -357,7 +385,7 @@ export default function AddProductPage() {
                       if (e.target.files) {
                         const data = await uploadFile(e.target.files[0]);
                         if (data.success) {
-                          setForm((prev) => ({ ...prev, thumbnail: data.url }));
+                          handleFormChange({ ...form, thumbnail: data.url });
                         }
                       }
                     }}

@@ -15,7 +15,7 @@ export function getCookieOptions() {
   return {
     httpOnly: true,
     secure: isProduction,
-    sameSite: "lax" as const,
+    sameSite: "strict" as const,
     maxAge: 60 * 60 * 24 * 7, // 7 days
     path: "/",
     domain: isProduction && domain && domain !== "localhost" ? domain : undefined,
