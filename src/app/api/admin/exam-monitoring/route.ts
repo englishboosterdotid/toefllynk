@@ -6,7 +6,8 @@ import { verifyToken } from "@/lib/services/authService";
 export async function GET() {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token")?.value;
+    // Check both auth_token and token (same JWT, different cookie names)
+    const token = cookieStore.get("auth_token")?.value || cookieStore.get("token")?.value;
 
     if (!token) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });

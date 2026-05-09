@@ -7,6 +7,8 @@ type ProductCardProps = {
   thumbnail?: string | null;
   affiliateEnabled: boolean;
   isArchived: boolean;
+  isVisibleOnMicrosite: boolean;
+  isFeatured?: boolean;
   packageType?: string | null;
   examCredits: number;
   certificateIncluded: boolean;
@@ -23,6 +25,8 @@ export default function ProductCard({
   thumbnail,
   affiliateEnabled,
   isArchived,
+  isVisibleOnMicrosite,
+  isFeatured = false,
   packageType,
   examCredits,
   certificateIncluded,
@@ -42,20 +46,34 @@ export default function ProductCard({
   const isBundle = packageType === "BUNDLE";
 
   return (
-    <div className="bg-white rounded-3xl shadow p-5">
+    <div className={`bg-white rounded-3xl shadow p-5 ${isVisibleOnMicrosite ? "ring-2 ring-green-400" : ""}`}>
       {thumbnail && (
         <img src={thumbnail} className="w-full h-44 object-cover rounded-2xl mb-4" />
       )}
 
       <div className="flex justify-between items-start mb-3">
         <div>
-          <p className="text-xs text-blue-500 font-semibold mb-1">
-            {isBundle ? "BUNDLE PACKAGE" : packageType || "INDIVIDUAL PACKAGE"}
-          </p>
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-xs text-blue-500 font-semibold">
+              {isBundle ? "BUNDLE PACKAGE" : packageType || "INDIVIDUAL PACKAGE"}
+            </p>
+            {isFeatured && (
+              <span className="text-xs bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full font-medium">
+                ★ Featured
+              </span>
+            )}
+          </div>
           <h3 className="text-xl font-bold">{title}</h3>
         </div>
 
-        <span className="text-xs bg-gray-100 px-3 py-1 rounded-full">{status}</span>
+        <div className="flex flex-col items-end gap-1">
+          <span className="text-xs bg-gray-100 px-3 py-1 rounded-full">{status}</span>
+          {isVisibleOnMicrosite && (
+            <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full">
+              Visible
+            </span>
+          )}
+        </div>
       </div>
 
       <p className="text-sm text-gray-500 mt-2">{description}</p>
@@ -84,10 +102,26 @@ export default function ProductCard({
           </button>
         </form>
 
+        <form action="/api/products/toggle-visibility" method="POST">
+          <input type="hidden" name="productId" value={id} />
+          <input type="hidden" name="visible" value={isVisibleOnMicrosite ? "false" : "true"} />
+          <button className={`${isVisibleOnMicrosite ? "bg-orange-50 text-orange-600" : "bg-green-50 text-green-600"} px-4 py-2 rounded-full text-sm`}>
+            {isVisibleOnMicrosite ? "Hide from Microsite" : "Show on Microsite"}
+          </button>
+        </form>
+
         <form action="/api/products/archive" method="POST">
           <input type="hidden" name="productId" value={id} />
           <button className="bg-red-50 text-red-500 px-4 py-2 rounded-full text-sm">
             {isArchived ? "Reopen Program" : "Close Program"}
+          </button>
+        </form>
+
+        <form action="/api/products/featured" method="POST">
+          <input type="hidden" name="productId" value={id} />
+          <input type="hidden" name="featured" value={isFeatured ? "false" : "true"} />
+          <button className={`${isFeatured ? "bg-amber-50 text-amber-600" : "bg-purple-50 text-purple-600"} px-4 py-2 rounded-full text-sm`}>
+            {isFeatured ? "Remove Featured" : "Set Featured"}
           </button>
         </form>
       </div>

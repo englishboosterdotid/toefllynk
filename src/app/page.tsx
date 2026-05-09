@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -15,10 +15,13 @@ import {
   Shield,
   Lock,
   CreditCard,
+  Crown,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatedContainer } from "@/components/animations";
 import { FeatureCard } from "@/components/cards";
+import { AuthStatus } from "@/components/auth/AuthStatus";
 
 const features = [
   {
@@ -80,42 +83,48 @@ const stats = [
 
 const plans = [
   {
-    name: "Free",
+    name: "Coba",
     price: 0,
-    description: "Untuk memulai",
+    description: "Gratis untuk memulai",
     features: [
-      "3 Produk",
+      "3 Produk untuk dijual",
+      "3 Produk di microsite",
       "Affiliate System",
-      "Basic Analytics",
       "Midtrans Payment",
-      "Email Support",
+      "Basic Analytics",
     ],
     popular: false,
   },
   {
-    name: "Pro",
-    price: 199000,
+    name: "Berkembang",
+    price: 79000,
     description: "Untuk growing business",
     features: [
-      "Unlimited Products",
-      "Affiliate System",
-      "Advanced Analytics",
+      "Unlimited Produk",
+      "15 Produk di microsite",
+      "Custom Certificate",
+      "Promo/Discount Code",
       "Custom Domain",
-      "Priority Support",
+      "Basic Theme Custom",
+      "Customer Database (500)",
+      "Email Marketing (1.000/bulan)",
       "API Access",
     ],
     popular: true,
   },
   {
-    name: "Enterprise",
-    price: 499000,
+    name: "Bisnis",
+    price: 199000,
     description: "Untuk scale besar",
     features: [
-      "Everything in Pro",
-      "White Label",
-      "Custom Integration",
-      "Dedicated Support",
-      "SLA Guarantee",
+      "Unlimited Produk",
+      "Unlimited Microsite",
+      "Full Theme Custom",
+      "Custom Footer/Header",
+      "Remove Lynk Logo",
+      "Customer Database (Unlimited)",
+      "Email Marketing (10.000/bulan)",
+      "Webhook Integration",
     ],
     popular: false,
   },
@@ -124,7 +133,11 @@ const plans = [
 const faqs = [
   {
     question: "Berapa biaya untuk bergabung di TOEFLLYNK?",
-    answer: "TOEFLLYNK 100% gratis untuk registrasi dan membuat produk. Kami mengambil fee kecil dari setiap transaksi (platform fee) untuk menjaga server dan mengembangkan fitur baru.",
+    answer: "TOEFLLYNK memiliki paket gratis (Coba) yang bisa langsung digunakan. Kami mengambil platform fee kecil dari setiap transaksi: Coba 10%, Berkembang 5%, Bisnis 3%. Fee ini membantu kami menjaga server dan mengembangkan fitur baru.",
+  },
+  {
+    question: "Apa perbedaan antar paket?",
+    answer: "Paket Coba gratis dengan 3 produk. Berkembang Rp 79rb/bulan unlimited + custom domain + API + CRM. Bisnis Rp 199rb/bulan unlimited + white-label microsite + webhook.",
   },
   {
     question: "Bagaimana sistem pembayaran di TOEFLLYNK?",
@@ -132,19 +145,15 @@ const faqs = [
   },
   {
     question: "Apakah saya bisa menjadi affiliate?",
-    answer: "Tentu! Siapa saja bisa menjadi affiliate di TOEFLLYNK. Anda bisa mendapatkan komisi 10-30% dari setiap penjualan yang berhasil melalui link affiliate Anda.",
+    answer: "Tentu! Siapa saja bisa menjadi affiliate di TOEFLLYNK, bahkan dengan paket gratis. Anda bisa mendapatkan komisi 10-30% dari setiap penjualan yang berhasil melalui link affiliate Anda.",
   },
   {
     question: "Bagaimana cara menarik uang dari penjualan?",
-    answer: "Saldo dari penjualan akan masuk ke akun TOEFLLYNK Anda. Anda bisa menarik ke rekening bank kapan saja dengan minimal penarikan Rp 50.000. Proses penarikan biasanya 1-3 hari kerja.",
-  },
-  {
-    question: "Apakah ada garansi/refund?",
-    answer: "Kebijakan refund sepenuhnya bergantung pada kebijakan masing-masing seller. TOEFLLYNK tidak memproses refund secara otomatis. Silakan hubungi seller langsung untuk permintaan refund.",
+    answer: "Saldo dari penjualan akan masuk ke akun TOEFLLYNK Anda. Anda bisa menarik ke rekening bank kapan saja. Biaya penarikan: Coba 5%, Berkembang 2%, Bisnis 0%. Proses penarikan biasanya 1-3 hari kerja.",
   },
   {
     question: "Bisakah saya menggunakan domain sendiri?",
-    answer: "Ya! Dengan paket Pro atau Enterprise, Anda bisa menghubungkan custom domain ke microsite Anda. Ini membuat brand Anda lebih profesional dan mudah diingat.",
+    answer: "Ya! Dengan paket Berkembang atau Bisnis, Anda bisa menghubungkan custom domain ke microsite Anda. Paket Bisnis juga menyediakan white-label microsite untuk pengalaman brand yang lebih profesional.",
   },
 ];
 
@@ -153,6 +162,19 @@ export default function HomePage() {
   const [cookieConsent, setCookieConsent] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [videoPlaying, setVideoPlaying] = useState(false);
+
+  // Check for existing consent on mount (client-side only)
+  useEffect(() => {
+    const savedConsent = localStorage.getItem("cookie-consent");
+    if (savedConsent) {
+      setCookieConsent(true);
+    }
+  }, []);
+
+  const handleCookieConsent = () => {
+    localStorage.setItem("cookie-consent", "true");
+    setCookieConsent(true);
+  };
 
   return (
     <main className="min-h-screen">
@@ -169,13 +191,13 @@ export default function HomePage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCookieConsent(true)}
+                  onClick={handleCookieConsent}
                 >
                   Hanya Esensial
                 </Button>
                 <Button
                   size="sm"
-                  onClick={() => setCookieConsent(true)}
+                  onClick={handleCookieConsent}
                 >
                   Terima Semua
                 </Button>
@@ -212,14 +234,7 @@ export default function HomePage() {
           </div>
 
           <div className="hidden items-center gap-3 md:flex">
-            <Link href="/login">
-              <Button variant="ghost" size="sm">
-                Login
-              </Button>
-            </Link>
-            <Link href="/register">
-              <Button size="sm">Mulai Gratis</Button>
-            </Link>
+            <AuthStatus variant="desktop" />
           </div>
 
           {/* Mobile Menu Button */}
@@ -274,12 +289,7 @@ export default function HomePage() {
                   Testimoni
                 </Link>
                 <div className="flex flex-col gap-2 pt-4">
-                  <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="outline" className="w-full">Login</Button>
-                  </Link>
-                  <Link href="/register" onClick={() => setMobileMenuOpen(false)}>
-                    <Button className="w-full">Mulai Gratis</Button>
-                  </Link>
+                  <AuthStatus variant="mobile" />
                 </div>
               </div>
             </motion.div>

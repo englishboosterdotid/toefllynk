@@ -19,6 +19,13 @@ enum Role {
   ADMIN
 }
 
+enum SellerTier {
+  FREE    // 10% platform fee, 1 product max
+  BASIC   // 8% platform fee, 5 products
+  PRO     // 5% platform fee, unlimited products
+  BUSINESS // 3% platform fee, unlimited + white-label
+}
+
 enum Category {
   IELTS
   TOEFL
@@ -66,6 +73,19 @@ model User {
   ctaText  String?
   role     Role    @default(USER)
 
+  // Seller tier system
+  sellerTier        SellerTier  @default(FREE)
+  subscriptionStart DateTime?
+  subscriptionEnd  DateTime?
+  customFeeRate    Int?         // Override fee rate (0-20), null = use tier default
+  tierChangedAt    DateTime?
+  tierChangeReason String?
+
+  // Custom domain (BUSINESS only)
+  customDomain     String?
+  domainVerified    Boolean     @default(false)
+  domainVerifiedAt DateTime?
+
   // Bank info for withdrawals
   bankName    String?
   bankAccount String?
@@ -84,6 +104,15 @@ model User {
   auditLogs             AdminAuditLog[]
   withdrawalRequests    WithdrawalRequest[]
   processedWithdrawals  WithdrawalRequest[]   @relation("WithdrawalProcessor")
+  tierLogs             SellerTierLog[]
+  certificateTemplate  CertificateTemplate?
+  promoCodes          PromoCode[]
+  micrositeSettings  MicrositeSettings?
+  apiKey            ApiKey?
+  webhookEndpoints  WebhookEndpoint[]
+  customers         Customer[]
+  emailCampaigns    EmailCampaign[]
+  supportTickets    SupportTicket[]
 }
 
 model Product {
@@ -105,6 +134,8 @@ model Product {
   affiliateEnabled    Boolean     @default(false)
   affiliateCommission Int         @default(10)
   isArchived          Boolean     @default(false)
+  isVisibleOnMicrosite Boolean    @default(true)
+  isFeatured         Boolean     @default(false) // PRO+ can set featured products
   createdAt           DateTime    @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -114,11 +145,13 @@ model Product {
   studentCredits       StudentExamCredit[]
   examResults          ExamResult[]
   affiliateClicks      AffiliateClick[]
+  productViews         ProductView[]
 
   @@index([userId])
   @@index([category])
   @@index([productType])
   @@index([isArchived])
+  @@index([isVisibleOnMicrosite])
 }
 
 model AffiliateEnrollment {
@@ -169,11 +202,16 @@ model Order {
 
   product Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
   student StudentAccount? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  customer Customer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerId String?
 
   @@index([status])
   @@index([createdAt])
   @@index([productId])
   @@index([referralCode])
+  @@index([customerId])
+  @@index([buyerEmail])
+  @@index([productId, status])
 }
 
 model AffiliateConversion {
@@ -271,7 +309,6 @@ model StudentAccount {
 
   credits        StudentExamCredit[]
   results        ExamResult[]
-  sessionAnswers ExamSessionAnswer[]
   sessions       ExamSession[]
   orders         Order[]
 }
@@ -307,6 +344,7 @@ model ExamResult {
   @@index([studentId])
   @@index([productId])
   @@index([createdAt])
+  @@index([totalScore])
 }
 
 model QuestionBank {
@@ -321,7 +359,6 @@ model QuestionBank {
   createdAt      DateTime @default(now())
 
   options        QuestionOption[]
-  sessionAnswers ExamSessionAnswer[]
   examAnswers    ExamAnswer[]
 
   @@index([section])
@@ -336,21 +373,6 @@ model QuestionOption {
   question QuestionBank @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   @@unique([questionId, optionKey])
-}
-
-model ExamSessionAnswer {
-  id          String   @id @default(cuid())
-  studentId   String
-  questionId  String
-  selectedKey String
-  createdAt   DateTime @default(now())
-
-  student  StudentAccount @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  question QuestionBank   @relation(fields: [questionId], references: [id], onDelete: Cascade)
-
-  @@index([studentId])
-  @@index([questionId])
-  @@index([studentId, questionId])
 }
 
 enum SessionStatus {
@@ -379,6 +401,7 @@ model ExamSession {
 
   @@index([studentId])
   @@index([status])
+  @@index([lastActivity])
 }
 
 enum ActivityType {
@@ -450,4 +473,339 @@ model ExamAnswer {
 
   @@unique([sessionId, questionId])
   @@index([sessionId])
+}
+
+model SellerTierLog {
+  id          String     @id @default(cuid())
+  userId      String
+  oldTier     SellerTier?
+  newTier     SellerTier
+  changedBy   String     // "ADMIN", "SYSTEM", or userId for self-upgrade
+  reason      String?
+  feeOverride Int?
+  createdAt   DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Subscription {
+  id                String      @id @default(cuid())
+  userId            String      @unique
+  tier              SellerTier
+  transactionId     String?     // Midtrans transaction ID
+  amount            Int         // in Rupiah
+  status            String      @default("PENDING") // PENDING, ACTIVE, EXPIRED, CANCELLED
+  startedAt         DateTime?
+  expiresAt         DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([transactionId])
+}
+
+model SubscriptionPlan {
+  id          String     @id @default(cuid())
+  tier        SellerTier @unique
+  name        String     // Display name (e.g., "Mulai", "Berkembang", "Bisnis")
+  price       Int        // Monthly price in Rupiah
+  periodDays  Int        @default(30)
+  isActive    Boolean    @default(true)
+  features    Json       // Array of feature strings
+  createdAt   DateTime   @default(now())
+
+  @@index([tier])
+}
+
+model CertificateTemplate {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  name            String   @default("Custom Template")
+
+  // Header Content
+  title           String   @default("TOEFL ITP Simulation")
+  subtitle        String   @default("Certificate of Completion")
+
+  // Logo
+  showLogo        Boolean  @default(true)
+  logoUrl         String?
+
+  // Signature
+  signatureText   String   @default("Authorized Signature")
+
+  // Footer
+  footerText      String?
+
+  // Validity
+  validityDays    Int?     @default(365)  // Certificate validity in days (null = permanent)
+
+  // Background Image
+  backgroundImage String?
+
+  // Layout
+  fontFamily      String   @default("Inter")
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model MicrositeSettings {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+
+  // Header
+  customHeaderHtml String?  // Custom HTML for header (BUSINESS)
+  showDefaultHeader Boolean @default(true)
+
+  // Footer
+  customFooterHtml String?  // Custom HTML for footer (BUSINESS)
+  showDefaultFooter Boolean @default(true)
+  footerText        String? // Simple text footer
+
+  // Branding
+  removeLynkLogo   Boolean @default(false) // BUSINESS only
+  showPoweredBy    Boolean @default(true)
+
+  // Theme customization
+  themeMode        String   @default("light") // "light", "dark", "auto"
+  primaryColor     String   @default("#3b82f6") // PRO+
+  secondaryColor   String?  // BUSINESS only
+  accentColor       String?  // BUSINESS only
+  fontFamily        String   @default("Inter") // BUSINESS only
+  customCss         String?  // BUSINESS only - custom CSS override
+
+  // Social links
+  socialInstagram  String?
+  socialFacebook   String?
+  socialTwitter    String?
+  socialYoutube    String?
+  socialTiktok     String?
+  socialLinkedin   String?
+
+  // Contact info
+  contactEmail     String?
+  contactPhone     String?
+  contactAddress   String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum PromoType {
+  PERCENTAGE
+  FIXED
+}
+
+enum PromoStatus {
+  ACTIVE
+  INACTIVE
+  EXPIRED
+  USED_UP
+}
+
+model PromoCode {
+  id            String      @id @default(cuid())
+  userId        String
+  code          String      @unique
+  type          PromoType   @default(PERCENTAGE)
+  value         Int         // percentage (0-100) or fixed amount in Rupiah
+  minPurchase   Int         @default(0) // minimum purchase amount to apply
+  maxDiscount   Int?        // maximum discount amount (for percentage type)
+  usageLimit    Int?        // total uses allowed (null = unlimited)
+  usageCount    Int         @default(0) // current usage count
+  startDate     DateTime    @default(now())
+  endDate       DateTime?   // null = no expiry
+  status        PromoStatus @default(ACTIVE)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  redemptions   PromoRedemption[]
+
+  @@index([userId])
+  @@index([code])
+  @@index([status])
+}
+
+model PromoRedemption {
+  id          String    @id @default(cuid())
+  promoId     String
+  orderId     String
+  userId      String    // buyer who used the code
+  discount    Int       // actual discount amount applied
+  usedAt      DateTime  @default(now())
+
+  promo PromoCode @relation(fields: [promoId], references: [id], onDelete: Cascade)
+
+  @@index([promoId])
+  @@index([userId])
+}
+
+// ============ CRM MODELS ============
+
+model Customer {
+  id            String    @id @default(cuid())
+  ownerUserId   String    // seller who owns this customer
+  buyerName     String
+  buyerEmail    String    @unique
+  buyerPhone    String?
+  buyerAddress  String?
+  totalPurchases Int     @default(0)
+  totalSpent    Int       @default(0)
+  lastPurchaseAt DateTime?
+  notes         String?
+  tags          String?   // comma-separated tags
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  ownerUser User   @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  orders    Order[]
+
+  @@index([ownerUserId])
+  @@index([buyerEmail])
+  @@index([createdAt])
+  @@index([ownerUserId, createdAt])
+}
+
+// ============ API & WEBHOOK MODELS ============
+
+model ApiKey {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  key           String    @unique // hashed key for verification
+  keyPrefix     String    // first 8 chars for display
+  name          String    // e.g., "Production", "Development"
+  permissions   Json      // array of permission strings
+  isActive      Boolean   @default(true)
+  lastUsedAt    DateTime?
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([key])
+}
+
+model WebhookEndpoint {
+  id           String    @id @default(cuid())
+  userId       String
+  url          String
+  events       Json      // array of event types: ["order.completed", "order.refunded", "withdrawal.completed"]
+  secret       String?   // for signature verification
+  isActive     Boolean   @default(true)
+  lastTriggered DateTime?
+  failureCount Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  deliveries WebhookDelivery[]
+
+  @@index([userId])
+  @@index([isActive])
+}
+
+model WebhookDelivery {
+  id          String   @id @default(cuid())
+  webhookId   String
+  event       String   // event type
+  payload     Json     // sent payload
+  response    Json?    // response from endpoint
+  statusCode  Int?
+  success     Boolean  @default(false)
+  error       String?
+  deliveredAt DateTime @default(now())
+
+  webhook WebhookEndpoint @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([deliveredAt])
+}
+
+// ============ ANALYTICS MODELS ============
+
+model ProductView {
+  id          String   @id @default(cuid())
+  productId   String
+  viewerIp    String?
+  userAgent   String?
+  referrer    String?
+  viewedAt    DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([viewedAt])
+}
+
+model EmailCampaign {
+  id            String    @id @default(cuid())
+  userId        String
+  name          String
+  subject       String
+  template      String?   // HTML template
+  sentCount     Int       @default(0)
+  deliveredCount Int      @default(0)
+  openCount     Int       @default(0)
+  clickCount    Int       @default(0)
+  status        String    @default("DRAFT") // DRAFT, SCHEDULED, SENDING, SENT
+  scheduledAt   DateTime?
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([sentAt])
+}
+
+// ============ SUPPORT MODELS ============
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model SupportTicket {
+  id              String           @id @default(cuid())
+  userId          String
+  subject         String
+  message         String           // Initial message from user
+  responseMessage String?          // Response from admin/support
+  status          TicketStatus     @default(OPEN)
+  priority        TicketPriority   @default(NORMAL)
+  category        String?          // BUG, FEATURE, BILLING, GENERAL, etc.
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([category])
 }

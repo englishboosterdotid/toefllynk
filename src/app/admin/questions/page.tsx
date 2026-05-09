@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AnimatedContainer } from "@/components/animations";
 import Link from "next/link";
+import { sanitizeRichText } from "@/lib/sanitize";
 
 interface QuestionOption {
   id: string;
@@ -321,7 +322,7 @@ export default function AdminQuestionsPage() {
                       <td className="px-6 py-4">
                         <div
                           className="text-sm text-slate-900 line-clamp-2 max-w-md prose prose-sm prose-slate max-w-none"
-                          dangerouslySetInnerHTML={{ __html: question.questionText }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeRichText(question.questionText) }}
                         />
                       </td>
                       <td className="px-6 py-4">
@@ -427,7 +428,7 @@ export default function AdminQuestionsPage() {
                     <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Passage</p>
                     <div
                       className="prose prose-sm prose-slate max-w-none"
-                      dangerouslySetInnerHTML={{ __html: viewModal.passageText }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeRichText(viewModal.passageText || "") }}
                     />
                   </div>
                 )}
@@ -437,7 +438,7 @@ export default function AdminQuestionsPage() {
                   <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Question</p>
                   <div
                     className="prose prose-slate max-w-none"
-                    dangerouslySetInnerHTML={{ __html: viewModal.questionText }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeRichText(viewModal.questionText) }}
                   />
                 </div>
 
@@ -463,7 +464,7 @@ export default function AdminQuestionsPage() {
                         </div>
                         <div
                           className="flex-1 prose prose-sm max-w-none"
-                          dangerouslySetInnerHTML={{ __html: opt.optionText }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeRichText(opt.optionText) }}
                         />
                         {opt.optionKey === viewModal.correctAnswer && (
                           <CheckCircle2 className="h-5 w-5 text-green-500" />
@@ -479,7 +480,7 @@ export default function AdminQuestionsPage() {
                     <p className="text-xs font-semibold text-amber-600 uppercase mb-2">Explanation</p>
                     <div
                       className="prose prose-sm prose-amber max-w-none"
-                      dangerouslySetInnerHTML={{ __html: viewModal.explanation }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeRichText(viewModal.explanation || "") }}
                     />
                   </div>
                 )}
@@ -535,7 +536,7 @@ export default function AdminQuestionsPage() {
                     {" "}#{deleteConfirm.questionNumber}
                   </p>
                   <p className="text-sm text-slate-900 mt-2 line-clamp-2"
-                    dangerouslySetInnerHTML={{ __html: deleteConfirm.questionText }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeRichText(deleteConfirm.questionText) }}
                   />
                 </div>
               </div>

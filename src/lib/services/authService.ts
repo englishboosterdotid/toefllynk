@@ -1,9 +1,10 @@
-import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 import { Role } from "@/generated/prisma/enums";
+import { userRepository } from "@/lib/repositories";
 import { setAuthCookie, deleteAuthCookie } from "@/lib/cookies";
+import { RESERVED_USERNAMES } from "@/lib/constants";
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
 
@@ -22,6 +23,12 @@ export interface AuthUser {
   whatsapp: string | null;
   headline: string | null;
   ctaText: string | null;
+  sellerTier: string;
+  subscriptionEnd: Date | null;
+  customFeeRate: number | null;
+  customDomain: string | null;
+  domainVerified: boolean;
+  createdAt: Date;
   hasStudentAccount: boolean;
 }
 
@@ -61,24 +68,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     const decoded = verifyToken(token);
     if (!decoded) return null;
 
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        name: true,
-        role: true,
-        avatar: true,
-        bio: true,
-        whatsapp: true,
-        headline: true,
-        ctaText: true,
-        studentProfile: {
-          select: { id: true },
-        },
-      },
-    });
+    const user = await userRepository.findByIdWithStudent(decoded.userId);
 
     if (!user) return null;
 
@@ -93,12 +83,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
 export async function login(email: string, password: string): Promise<LoginResult> {
   try {
-    const user = await prisma.user.findUnique({
-      where: { email },
-      include: {
-        studentProfile: { select: { id: true } },
-      },
-    });
+    const user = await userRepository.findByEmail(email);
 
     if (!user) {
       return { success: false, error: "Email atau password salah" };
@@ -108,6 +93,9 @@ export async function login(email: string, password: string): Promise<LoginResul
     if (!isValid) {
       return { success: false, error: "Email atau password salah" };
     }
+
+    // Get full user data for response
+    const fullUser = await userRepository.findById(user.id);
 
     const token = generateToken(user.id, user.email, user.username, user.role);
     await setAuthCookie(token);
@@ -125,6 +113,12 @@ export async function login(email: string, password: string): Promise<LoginResul
         whatsapp: user.whatsapp,
         headline: user.headline,
         ctaText: user.ctaText,
+        sellerTier: fullUser?.sellerTier || "FREE",
+        subscriptionEnd: fullUser?.subscriptionEnd || null,
+        customFeeRate: fullUser?.customFeeRate || null,
+        customDomain: fullUser?.customDomain || null,
+        domainVerified: fullUser?.domainVerified || false,
+        createdAt: fullUser?.createdAt || new Date(),
         hasStudentAccount: !!user.studentProfile,
       },
     };
@@ -141,25 +135,28 @@ export async function register(
   username: string
 ): Promise<LoginResult> {
   try {
-    const existingEmail = await prisma.user.findUnique({ where: { email } });
+    // Check reserved usernames
+    if (RESERVED_USERNAMES.includes(username.toLowerCase())) {
+      return { success: false, error: "Username ini tidak tersedia" };
+    }
+
+    const existingEmail = await userRepository.checkEmailExists(email);
     if (existingEmail) {
       return { success: false, error: "Email sudah terdaftar" };
     }
 
-    const existingUsername = await prisma.user.findUnique({ where: { username } });
+    const existingUsername = await userRepository.checkUsernameExists(username);
     if (existingUsername) {
       return { success: false, error: "Username sudah digunakan" };
     }
 
     const hashedPassword = await hashPassword(password);
 
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        username,
-      },
+    const user = await userRepository.create({
+      name,
+      email,
+      password: hashedPassword,
+      username,
     });
 
     const token = generateToken(user.id, user.email, user.username, user.role);
@@ -168,16 +165,7 @@ export async function register(
     return {
       success: true,
       user: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        name: user.name,
-        role: user.role,
-        avatar: user.avatar,
-        bio: user.bio,
-        whatsapp: user.whatsapp,
-        headline: user.headline,
-        ctaText: user.ctaText,
+        ...user,
         hasStudentAccount: false,
       },
     };
@@ -203,29 +191,15 @@ export async function updateProfile(
   }>
 ): Promise<AuthUser | null> {
   try {
-    const user = await prisma.user.update({
-      where: { id: userId },
-      data,
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        name: true,
-        role: true,
-        avatar: true,
-        bio: true,
-        whatsapp: true,
-        headline: true,
-        ctaText: true,
-        studentProfile: {
-          select: { id: true },
-        },
-      },
-    });
+    const user = await userRepository.update(userId, data);
+
+    if (!user) return null;
+
+    const userWithStudent = await userRepository.findByIdWithStudent(userId);
 
     return {
       ...user,
-      hasStudentAccount: !!user.studentProfile,
+      hasStudentAccount: !!userWithStudent?.studentProfile,
     };
   } catch (error) {
     console.error("Update profile error:", error);

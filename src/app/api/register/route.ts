@@ -1,19 +1,18 @@
-import prisma from "@/lib/prisma";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { setAuthCookie } from "@/lib/cookies";
+import { register } from "@/lib/services/authService";
 import { z } from "zod";
-
-const JWT_SECRET = process.env.JWT_SECRET as string;
-
-if (!JWT_SECRET) {
-  throw new Error("JWT_SECRET environment variable is required!");
-}
+import { isReservedUsername } from "@/lib/constants";
+import { userRepository } from "@/lib/repositories";
 
 const RegisterSchema = z.object({
   name: z.string().min(2, "Nama harus minimal 2 karakter").max(100, "Nama harus maksimal 100 karakter"),
   email: z.string().email("Format email tidak valid"),
-  username: z.string().min(3, "Username harus minimal 3 karakter").max(50, "Username harus maksimal 50 karakter").regex(/^[a-zA-Z0-9_]+$/, "Username hanya boleh huruf, angka, dan underscore"),
+  username: z.string()
+    .min(3, "Username harus minimal 3 karakter")
+    .max(50, "Username harus maksimal 50 karakter")
+    .regex(/^[a-zA-Z0-9_]+$/, "Username hanya boleh huruf, angka, dan underscore")
+    .refine((val) => !isReservedUsername(val), {
+      message: "Username ini tidak tersedia",
+    }),
   password: z.string()
     .min(8, "Password harus minimal 8 karakter")
     .regex(/[a-z]/, "Password harus mengandung huruf kecil")
@@ -34,40 +33,24 @@ export async function POST(req: Request) {
 
     const { name, email, username, password } = validation.data;
 
-    const existingEmail = await prisma.user.findUnique({
-      where: { email },
-    });
-
+    // Check email existence
+    const existingEmail = await userRepository.checkEmailExists(email);
     if (existingEmail) {
       return Response.json({ success: false, message: "Email sudah dipakai" }, { status: 409 });
     }
 
-    const existingUsername = await prisma.user.findUnique({
-      where: { username },
-    });
-
+    // Check username existence
+    const existingUsername = await userRepository.checkUsernameExists(username);
     if (existingUsername) {
       return Response.json({ success: false, message: "Username sudah dipakai" }, { status: 409 });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
+    // Use authService.register() for actual registration
+    const result = await register(name, email, password, username);
 
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        username,
-        password: hashedPassword,
-      },
-    });
-
-    const token = jwt.sign(
-      { userId: user.id, email: user.email, username: user.username, role: user.role },
-      JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    await setAuthCookie(token);
+    if (!result.success) {
+      return Response.json({ success: false, message: result.error }, { status: 400 });
+    }
 
     return Response.json({ success: true, message: "Registrasi berhasil" });
   } catch (error) {

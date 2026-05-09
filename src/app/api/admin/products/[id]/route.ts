@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
+import { cleanupFileChange, deleteStorageFile } from "@/lib/fileCleanup";
 
 export async function GET(
   req: Request,
@@ -39,6 +40,12 @@ export async function PUT(
     const { id } = await params;
     const body = await req.json();
 
+    // Get current product to check for file cleanup
+    const currentProduct = await prisma.product.findUnique({
+      where: { id },
+      select: { thumbnail: true },
+    });
+
     const product = await prisma.product.update({
       where: { id },
       data: {
@@ -61,6 +68,11 @@ export async function PUT(
       },
     });
 
+    // Clean up old thumbnail if changed
+    if (currentProduct?.thumbnail) {
+      await cleanupFileChange(currentProduct.thumbnail, body.thumbnail);
+    }
+
     return NextResponse.json({
       success: true,
       message: "Product updated successfully",
@@ -82,9 +94,20 @@ export async function DELETE(
     await requireAdmin();
     const { id } = await params;
 
+    // Get product to delete its thumbnail
+    const product = await prisma.product.findUnique({
+      where: { id },
+      select: { thumbnail: true },
+    });
+
     await prisma.product.delete({
       where: { id },
     });
+
+    // Clean up thumbnail file if exists
+    if (product?.thumbnail) {
+      await deleteStorageFile(product.thumbnail);
+    }
 
     return NextResponse.json({
       success: true,

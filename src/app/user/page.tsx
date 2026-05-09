@@ -15,7 +15,18 @@ import {
   BookOpen,
   DollarSign,
   Target,
+  Crown,
+  Star,
+  TrendingUp as TrendingUpIcon,
+  AlertTriangle,
+  ExternalLink,
 } from "lucide-react";
+
+const tierConfig: Record<string, { label: string; color: string; bg: string; icon: any }> = {
+  FREE: { label: "Coba", color: "text-slate-600", bg: "bg-slate-100", icon: Star },
+  PRO: { label: "Berkembang", color: "text-purple-600", bg: "bg-purple-100", icon: TrendingUpIcon },
+  BUSINESS: { label: "Bisnis", color: "text-amber-600", bg: "bg-amber-100", icon: Crown },
+};
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
@@ -65,7 +76,16 @@ export default async function DashboardPage() {
 
   const micrositeReady = await prisma.user.findUnique({
     where: { id: user?.id },
+    select: {
+      sellerTier: true,
+      subscriptionEnd: true,
+      customFeeRate: true,
+    },
   });
+
+  const tierInfo = micrositeReady;
+  const currentTier = tierInfo?.sellerTier || "FREE";
+  const tierStyle = tierConfig[currentTier] || tierConfig.FREE;
 
   const affiliateJoined = await prisma.affiliateEnrollment.count({
     where: {
@@ -77,7 +97,7 @@ export default async function DashboardPage() {
     {
       label: "Setup Your Microsite Branding",
       href: "/user/microsite",
-      done: !!micrositeReady?.headline,
+      done: false,
     },
     {
       label: "Create Your First TOEFL Package",
@@ -109,6 +129,73 @@ export default async function DashboardPage() {
           <p className="mt-1 text-slate-500">
             Anda beroperasi sebagai Seller, Affiliate Partner, dan TOEFL Provider
           </p>
+        </div>
+      </AnimatedContainer>
+
+      {/* Current Plan Card */}
+      <AnimatedContainer delay={0.05}>
+        <div className={`rounded-2xl border-2 ${currentTier === "BUSINESS" ? "border-amber-300 bg-gradient-to-r from-amber-50 to-amber-100/50" : currentTier === "PRO" ? "border-purple-300 bg-gradient-to-r from-purple-50 to-purple-100/50" : "border-slate-200 bg-gradient-to-r from-slate-50 to-slate-100/50"} p-6`}>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${tierStyle.bg}`}>
+                <tierStyle.icon className={`h-7 w-7 ${tierStyle.color}`} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-slate-500">Plan Saat Ini</p>
+                  {currentTier !== "FREE" && tierInfo?.subscriptionEnd && (
+                    new Date(tierInfo.subscriptionEnd) < new Date() ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600">
+                        <AlertTriangle className="h-3 w-3" />
+                        Expired
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-600">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Active
+                      </span>
+                    )
+                  )}
+                </div>
+                <h2 className="text-2xl font-bold text-slate-900">{tierStyle.label}</h2>
+                <p className="text-sm text-slate-500">
+                  Platform Fee: {tierInfo?.customFeeRate || (currentTier === "FREE" ? "10%" : currentTier === "PRO" ? "5%" : "3%")}
+                  {tierInfo?.customFeeRate !== null && <span className="ml-1 text-purple-600">(custom)</span>}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                {tierInfo?.subscriptionEnd ? (
+                  <>
+                    <p className="text-xs text-slate-500">Berakhir</p>
+                    <p className="font-semibold text-slate-900">
+                      {new Date(tierInfo.subscriptionEnd).toLocaleDateString("id-ID", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-slate-500">Gratis selamanya</p>
+                )}
+              </div>
+              <Link href="/user/subscription">
+                <button className={`flex items-center gap-2 rounded-xl px-4 py-2.5 font-medium transition-colors ${
+                  currentTier === "BUSINESS"
+                    ? "bg-amber-500 text-white hover:bg-amber-600"
+                    : currentTier === "PRO"
+                    ? "bg-purple-500 text-white hover:bg-purple-600"
+                    : "bg-blue-500 text-white hover:bg-blue-600"
+                }`}>
+                  {currentTier === "FREE" ? "Upgrade" : "Manage"}
+                  <ExternalLink className="h-4 w-4" />
+                </button>
+              </Link>
+            </div>
+          </div>
         </div>
       </AnimatedContainer>
 

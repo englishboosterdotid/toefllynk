@@ -1,7 +1,6 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { verifyToken } from "@/lib/services/authService";
 
 // Section time limits in seconds
 export const SECTION_TIME_LIMITS: Record<string, number> = {
@@ -9,6 +8,18 @@ export const SECTION_TIME_LIMITS: Record<string, number> = {
   STRUCTURE: 25 * 60,     // 25 minutes
   READING: 55 * 60,        // 55 minutes
 };
+
+// Student token is a plain access token, not JWT - verify in DB
+async function verifyStudentToken(token: string): Promise<{ userId: string } | null> {
+  if (!token) return null;
+
+  const student = await prisma.studentAccount.findFirst({
+    where: { accessToken: token },
+    select: { id: true },
+  });
+
+  return student ? { userId: student.id } : null;
+}
 
 export async function POST(req: Request) {
   try {
@@ -19,7 +30,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyStudentToken(token);
     if (!decoded) {
       return NextResponse.json({ success: false, message: "Invalid token" }, { status: 401 });
     }
@@ -90,7 +101,7 @@ export async function GET() {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    const decoded = verifyToken(token);
+    const decoded = await verifyStudentToken(token);
     if (!decoded) {
       return NextResponse.json({ success: false, message: "Invalid token" }, { status: 401 });
     }

@@ -17,6 +17,9 @@ import {
   Award,
   Shield,
   Wallet,
+  Users,
+  Crown,
+  CreditCard,
 } from "lucide-react";
 
 const navItems = [
@@ -28,6 +31,15 @@ const navItems = [
   { label: "Live Monitor", href: "/admin/exam-monitoring", icon: Monitor },
   { label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
   { label: "Leaderboard", href: "/admin/leaderboard", icon: Award },
+];
+
+const sellerItems = [
+  { label: "Sellers", href: "/admin/sellers", icon: Users },
+  { label: "Subscriptions", href: "/admin/subscriptions", icon: Crown },
+  { label: "Plans", href: "/admin/subscriptions/plans", icon: CreditCard },
+];
+
+const systemItems = [
   { label: "Audit Log", href: "/admin/audit-log", icon: Shield },
   { label: "Settings", href: "/admin/settings", icon: Settings },
 ];
@@ -72,6 +84,56 @@ export function AdminSidebar({ activeSessions = 0, pendingOrders = 0, warningCou
             );
           })}
         </nav>
+
+        {/* Seller Management Section */}
+        <div className="mt-6">
+          <p className="px-3 mb-2 text-xs font-medium text-slate-400 uppercase tracking-wider">Seller Management</p>
+          <nav className="space-y-1">
+            {sellerItems.map((item) => {
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                    active
+                      ? "bg-purple-50 text-purple-700 border-l-4 border-purple-600 shadow-sm"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  }`}
+                >
+                  <item.icon className={`h-5 w-5 ${active ? "text-purple-600" : "text-slate-400"}`} />
+                  {item.label}
+                  {active && <ChevronRight className="ml-auto h-4 w-4" />}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* System Section */}
+        <div className="mt-6">
+          <p className="px-3 mb-2 text-xs font-medium text-slate-400 uppercase tracking-wider">System</p>
+          <nav className="space-y-1">
+            {systemItems.map((item) => {
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                    active
+                      ? "bg-slate-100 text-slate-700 border-l-4 border-slate-500 shadow-sm"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  }`}
+                >
+                  <item.icon className={`h-5 w-5 ${active ? "text-slate-600" : "text-slate-400"}`} />
+                  {item.label}
+                  {active && <ChevronRight className="ml-auto h-4 w-4" />}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
 
         {/* Quick Stats */}
         <div className="mt-8 px-3">

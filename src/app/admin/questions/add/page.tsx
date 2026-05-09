@@ -257,7 +257,7 @@ export default function AddQuestionPage() {
                       Audio File
                     </Label>
                     <FileUpload
-                      folder="audio/listening/"
+                      folder="audio/listening"
                       accept="audio/*"
                       maxSize={50}
                       currentValue={form.audioUrl}

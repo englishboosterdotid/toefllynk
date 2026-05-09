@@ -1,35 +1,7 @@
-import prisma from "@/lib/prisma";
 import { OrderStatus } from "@/generated/prisma/enums";
+import { orderRepository, productRepository, studentRepository, type OrderWithDetails } from "@/lib/repositories";
 import { generateAccessToken } from "@/lib/generateAccessToken";
-
-export interface OrderWithDetails {
-  id: string;
-  productId: string;
-  buyerName: string;
-  buyerEmail: string;
-  buyerWhatsapp: string | null;
-  referralCode: string | null;
-  status: OrderStatus;
-  studentId: string | null;
-  createdAt: Date;
-  product: {
-    id: string;
-    title: string;
-    price: number;
-    promoPrice: number | null;
-  };
-  student: {
-    id: string;
-    buyerName: string;
-    buyerEmail: string;
-    accessToken: string;
-  } | null;
-  affiliateConversion: {
-    id: string;
-    commissionAmount: number;
-    affiliateUserId: string;
-  } | null;
-}
+import prisma from "@/lib/prisma";
 
 export interface CreateOrderResult {
   success: boolean;
@@ -44,12 +16,12 @@ export async function createOrder(data: {
   buyerEmail: string;
   buyerWhatsapp?: string | null;
   referralCode?: string | null;
+  promoCodeId?: string | null;
+  discountAmount?: number;
+  finalPrice?: number;
 }): Promise<CreateOrderResult> {
   try {
-    const product = await prisma.product.findUnique({
-      where: { id: data.productId },
-      include: { user: true },
-    });
+    const product = await productRepository.findByIdWithOwner(data.productId);
 
     if (!product) {
       return { success: false, error: "Produk tidak ditemukan" };
@@ -60,55 +32,49 @@ export async function createOrder(data: {
     }
 
     // Check if buyer already has an account
-    let studentAccount = await prisma.studentAccount.findUnique({
-      where: { buyerEmail: data.buyerEmail },
-    });
+    let studentAccount = await studentRepository.findByEmail(data.buyerEmail);
 
     // Generate access token
     const accessToken = generateAccessToken();
 
     if (!studentAccount) {
-      studentAccount = await prisma.studentAccount.create({
-        data: {
-          buyerName: data.buyerName,
-          buyerEmail: data.buyerEmail,
-          buyerWhatsapp: data.buyerWhatsapp,
-          accessToken,
-          ownerUserId: product.userId,
-        },
+      studentAccount = await studentRepository.create({
+        buyerName: data.buyerName,
+        buyerEmail: data.buyerEmail,
+        buyerWhatsapp: data.buyerWhatsapp,
+        accessToken,
+        ownerUserId: product.userId,
       });
     }
 
     // Create order
-    const order = await prisma.order.create({
-      data: {
-        productId: data.productId,
-        buyerName: data.buyerName,
-        buyerEmail: data.buyerEmail,
-        buyerWhatsapp: data.buyerWhatsapp,
-        referralCode: data.referralCode,
-        status: OrderStatus.PENDING,
-        studentId: studentAccount.id,
-      },
-      include: {
-        product: {
-          select: {
-            id: true,
-            title: true,
-            price: true,
-            promoPrice: true,
-          },
-        },
-        student: {
-          select: {
-            id: true,
-            buyerName: true,
-            buyerEmail: true,
-            accessToken: true,
-          },
-        },
-      },
+    const order = await orderRepository.createWithStudent({
+      productId: data.productId,
+      buyerName: data.buyerName,
+      buyerEmail: data.buyerEmail,
+      buyerWhatsapp: data.buyerWhatsapp,
+      referralCode: data.referralCode,
+      studentId: studentAccount.id,
+      status: OrderStatus.PENDING,
     });
+
+    // Record promo redemption if applicable
+    if (data.promoCodeId && data.discountAmount && data.discountAmount > 0) {
+      await prisma.promoRedemption.create({
+        data: {
+          promoId: data.promoCodeId,
+          orderId: order.id,
+          userId: studentAccount.id,
+          discount: data.discountAmount,
+        },
+      });
+
+      // Update usage count
+      await prisma.promoCode.update({
+        where: { id: data.promoCodeId },
+        data: { usageCount: { increment: 1 } },
+      });
+    }
 
     return {
       success: true,
@@ -123,36 +89,9 @@ export async function createOrder(data: {
 
 export async function completeOrder(orderId: string): Promise<OrderWithDetails | null> {
   try {
-    const order = await prisma.order.update({
-      where: { id: orderId },
-      data: { status: OrderStatus.COMPLETED },
-      include: {
-        product: {
-          select: {
-            id: true,
-            title: true,
-            price: true,
-            promoPrice: true,
-            examCredits: true,
-          },
-        },
-        student: {
-          select: {
-            id: true,
-            buyerName: true,
-            buyerEmail: true,
-            accessToken: true,
-          },
-        },
-        affiliateConversion: {
-          select: {
-            id: true,
-            commissionAmount: true,
-            affiliateUserId: true,
-          },
-        },
-      },
-    });
+    const order = await orderRepository.updateStatus(orderId, OrderStatus.COMPLETED);
+
+    if (!order) return null;
 
     // Create student exam credits
     if (order.studentId && order.product) {
@@ -165,7 +104,7 @@ export async function completeOrder(orderId: string): Promise<OrderWithDetails |
       });
     }
 
-    return order as unknown as OrderWithDetails;
+    return order;
   } catch (error) {
     console.error("Complete order error:", error);
     return null;
@@ -173,125 +112,17 @@ export async function completeOrder(orderId: string): Promise<OrderWithDetails |
 }
 
 export async function cancelOrder(orderId: string): Promise<OrderWithDetails | null> {
-  try {
-    const order = await prisma.order.update({
-      where: { id: orderId },
-      data: { status: OrderStatus.CANCELLED },
-      include: {
-        product: {
-          select: {
-            id: true,
-            title: true,
-            price: true,
-            promoPrice: true,
-          },
-        },
-        student: {
-          select: {
-            id: true,
-            buyerName: true,
-            buyerEmail: true,
-            accessToken: true,
-          },
-        },
-      },
-    });
-
-    return order as unknown as OrderWithDetails;
-  } catch (error) {
-    console.error("Cancel order error:", error);
-    return null;
-  }
+  return orderRepository.updateStatus(orderId, OrderStatus.CANCELLED);
 }
 
 export async function getOrdersByUser(userId: string) {
-  return prisma.order.findMany({
-    where: {
-      product: {
-        userId,
-      },
-    },
-    orderBy: { createdAt: "desc" },
-    include: {
-      product: {
-        select: {
-          id: true,
-          title: true,
-          price: true,
-          promoPrice: true,
-        },
-      },
-      student: {
-        select: {
-          id: true,
-          buyerName: true,
-          buyerEmail: true,
-          accessToken: true,
-        },
-      },
-      affiliateConversion: {
-        select: {
-          id: true,
-          commissionAmount: true,
-          affiliateUserId: true,
-        },
-      },
-    },
-  });
+  return orderRepository.findByProductUser(userId);
 }
 
 export async function getOrdersByStudent(studentId: string) {
-  return prisma.order.findMany({
-    where: { studentId },
-    orderBy: { createdAt: "desc" },
-    include: {
-      product: {
-        select: {
-          id: true,
-          title: true,
-          price: true,
-          promoPrice: true,
-        },
-      },
-    },
-  });
+  return orderRepository.findByStudent(studentId);
 }
 
 export async function getOrderById(id: string): Promise<OrderWithDetails | null> {
-  return prisma.order.findUnique({
-    where: { id },
-    include: {
-      product: {
-        select: {
-          id: true,
-          title: true,
-          price: true,
-          promoPrice: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              username: true,
-            },
-          },
-        },
-      },
-      student: {
-        select: {
-          id: true,
-          buyerName: true,
-          buyerEmail: true,
-          accessToken: true,
-        },
-      },
-      affiliateConversion: {
-        select: {
-          id: true,
-          commissionAmount: true,
-          affiliateUserId: true,
-        },
-      },
-      adminFee: true,
-    },
-  }) as Promise<OrderWithDetails | null>;
+  return orderRepository.findById(id);
 }

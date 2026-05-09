@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -13,7 +13,6 @@ import {
   Store,
   Link2,
   DollarSign,
-  BarChart3,
   BookOpen,
   LogOut,
   Menu,
@@ -21,6 +20,14 @@ import {
   ChevronLeft,
   Zap,
   Wallet,
+  Crown,
+  Settings,
+  FileBadge,
+  Key,
+  Tag,
+  Webhook,
+  Mail,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -29,6 +36,8 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ElementType;
+  requiredTier?: "PRO" | "BUSINESS";
+  badge?: string;
 }
 
 interface NavGroup {
@@ -44,7 +53,38 @@ const navigationGroups: NavGroup[] = [
       { label: "My Microsite", href: "/user/microsite", icon: Globe },
       { label: "My Packages", href: "/user/products", icon: Package },
       { label: "Student Orders", href: "/user/orders", icon: ShoppingCart },
-      { label: "Participants CRM", href: "/user/participants", icon: Users },
+      { label: "Participants", href: "/user/participants", icon: Users },
+    ],
+  },
+  {
+    title: "Marketing & Sales",
+    items: [
+      { label: "Promo Codes", href: "/user/promo-codes", icon: Tag, requiredTier: "PRO", badge: "PRO" },
+      { label: "Customer Database", href: "/user/customers", icon: Users, requiredTier: "PRO", badge: "PRO" },
+      { label: "Email Campaigns", href: "/user/email-campaigns", icon: Mail, requiredTier: "PRO", badge: "PRO" },
+    ],
+  },
+  {
+    title: "Tools & Integration",
+    items: [
+      { label: "API Access", href: "/user/api-key", icon: Key, requiredTier: "PRO", badge: "PRO" },
+      { label: "Webhooks", href: "/user/webhooks", icon: Webhook, requiredTier: "BUSINESS", badge: "BUSINESS" },
+    ],
+  },
+  {
+    title: "Settings",
+    items: [
+      { label: "Certificate Template", href: "/user/settings/certificate", icon: FileBadge },
+      { label: "Custom Domain", href: "/user/settings/custom-domain", icon: Globe, requiredTier: "PRO", badge: "PRO" },
+      { label: "Microsite Settings", href: "/user/settings/microsite", icon: Settings },
+      { label: "Support", href: "/user/support", icon: Settings },
+    ],
+  },
+  {
+    title: "Account",
+    items: [
+      { label: "Upgrade Plan", href: "/user/subscription", icon: Crown },
+      { label: "Withdrawals", href: "/user/withdrawal", icon: Wallet },
     ],
   },
   {
@@ -53,8 +93,6 @@ const navigationGroups: NavGroup[] = [
       { label: "Affiliate Marketplace", href: "/user/affiliate-marketplace", icon: Store },
       { label: "My Affiliate Links", href: "/user/my-affiliate-links", icon: Link2 },
       { label: "Affiliate Earnings", href: "/user/affiliate-earnings", icon: DollarSign },
-      { label: "Withdrawals", href: "/user/withdrawal", icon: Wallet },
-      { label: "Referral Analytics", href: "/user/analytics", icon: BarChart3 },
     ],
   },
 ];
@@ -76,14 +114,46 @@ interface DashboardLayoutClientProps {
     avatar?: string | null;
     role?: string;
     hasStudentAccount?: boolean;
+    sellerTier?: string;
   };
   children: React.ReactNode;
+}
+
+function getRequiredTierRank(tier?: string): number {
+  switch (tier) {
+    case "PRO": return 1;
+    case "BUSINESS": return 2;
+    default: return 0;
+  }
+}
+
+function canAccessTierItem(requiredTier?: string, userTier?: string): boolean {
+  if (!requiredTier) return true;
+  const userRank = getRequiredTierRank(userTier);
+  const requiredRank = getRequiredTierRank(requiredTier);
+  return userRank >= requiredRank;
 }
 
 export function DashboardLayoutClient({ user, children }: DashboardLayoutClientProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [lockedItems, setLockedItems] = useState<Set<string>>(new Set());
+
+  // Check which items are locked based on user tier
+  useEffect(() => {
+    const locked = new Set<string>();
+    navigationGroups.forEach((group) => {
+      group.items.forEach((item) => {
+        if (!canAccessTierItem(item.requiredTier, user.sellerTier)) {
+          locked.add(item.href);
+        }
+      });
+    });
+    setLockedItems(locked);
+  }, [user.sellerTier]);
+
+  const isLocked = (href: string) => lockedItems.has(href);
 
   return (
     <div className="min-h-screen bg-slate-50/50">
@@ -138,29 +208,57 @@ export function DashboardLayoutClient({ user, children }: DashboardLayoutClientP
               )}
               <div className="space-y-1">
                 {group.items.map((item) => {
+                  const isItemLocked = isLocked(item.href);
                   const isExactMatch = pathname === item.href;
                   const isChildMatch = pathname.startsWith(item.href + "/") && item.href !== "/user";
                   const isActive = isExactMatch || isChildMatch;
                   return (
                     <Link
                       key={item.href}
-                      href={item.href}
-                      onClick={() => setSidebarOpen(false)}
+                      href={isItemLocked ? "/user/subscription" : item.href}
+                      onClick={(e) => {
+                        if (isItemLocked) {
+                          e.preventDefault();
+                          setSidebarOpen(false);
+                        } else {
+                          setSidebarOpen(false);
+                        }
+                      }}
                       className={cn(
                         "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
                         isActive
                           ? "bg-blue-50 text-blue-600"
-                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+                          : isItemLocked
+                            ? "text-slate-400 cursor-not-allowed opacity-60 hover:opacity-80"
+                            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
                         collapsed && "justify-center"
                       )}
                     >
                       <item.icon
                         className={cn(
                           "h-5 w-5 shrink-0 transition-colors",
-                          isActive ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
+                          isActive ? "text-blue-600" : isItemLocked ? "text-slate-300" : "text-slate-400 group-hover:text-slate-600"
                         )}
                       />
-                      {!collapsed && <span>{item.label}</span>}
+                      {!collapsed && (
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <span className={cn("truncate", isItemLocked && "text-slate-400")}>{item.label}</span>
+                          {isItemLocked && item.badge && (
+                            <span className="flex items-center gap-1 shrink-0 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
+                              <Lock className="h-3 w-3" />
+                              {item.badge}
+                            </span>
+                          )}
+                          {!isItemLocked && item.requiredTier && (
+                            <span className="shrink-0 text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">
+                              {item.badge}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {collapsed && isItemLocked && item.badge && (
+                        <Lock className="h-3 w-3 text-amber-600" />
+                      )}
 
                       {/* Active indicator */}
                       {isActive && !collapsed && (

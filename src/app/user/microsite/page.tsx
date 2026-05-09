@@ -48,6 +48,27 @@ export default function MicrositePage() {
     fd.append("file", file);
 
     try {
+      // Delete old avatar first if exists
+      if (form.avatar) {
+        let path = form.avatar;
+        // Handle both full URLs and relative paths
+        if (form.avatar.startsWith("http")) {
+          try {
+            path = new URL(form.avatar).pathname;
+          } catch {
+            // Keep as-is
+          }
+        }
+        // Extract path after /upload or /uploads
+        const uploadMatch = path.match(/\/(?:upload|uploads)\/(.+)/);
+        if (uploadMatch) {
+          path = uploadMatch[1]; // e.g., "general/xxx.png"
+        } else if (path.startsWith("/")) {
+          path = path.substring(1); // Remove leading slash
+        }
+        await fetch(`/api/upload?path=${encodeURIComponent(path)}`, { method: "DELETE" });
+      }
+
       const res = await fetch("/api/upload", {
         method: "POST",
         body: fd,

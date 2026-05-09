@@ -1,15 +1,6 @@
-import prisma from "@/lib/prisma";
-import bcrypt from "bcryptjs";
-import * as jwt from "jsonwebtoken";
-import { setAuthCookie } from "@/lib/cookies";
+import { login } from "@/lib/services/authService";
 import { loginSchema } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
-
-const JWT_SECRET = process.env.JWT_SECRET as string;
-
-if (!JWT_SECRET) {
-  throw new Error("JWT_SECRET environment variable is required!");
-}
 
 export async function POST(req: Request) {
   try {
@@ -33,37 +24,25 @@ export async function POST(req: Request) {
     }
 
     const { email, password } = validation.data;
+    const result = await login(email, password);
 
-    const user = await prisma.user.findUnique({
-      where: { email },
+    if (!result.success) {
+      return Response.json(
+        { success: false, message: result.error },
+        { status: 401 }
+      );
+    }
+
+    return Response.json({
+      success: true,
+      message: "Login berhasil",
+      user: {
+        id: result.user!.id,
+        role: result.user!.role,
+        username: result.user!.username,
+      },
     });
-
-    if (!user) {
-      return Response.json(
-        { success: false, message: "Email atau password salah" },
-        { status: 401 }
-      );
-    }
-
-    const valid = await bcrypt.compare(password, user.password);
-
-    if (!valid) {
-      return Response.json(
-        { success: false, message: "Email atau password salah" },
-        { status: 401 }
-      );
-    }
-
-    const token = jwt.sign(
-      { userId: user.id, email: user.email, username: user.username, role: user.role },
-      JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    await setAuthCookie(token);
-
-    return Response.json({ success: true, message: "Login berhasil" });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Login error:", error);
     return Response.json(
       { success: false, message: "Terjadi kesalahan saat login" },

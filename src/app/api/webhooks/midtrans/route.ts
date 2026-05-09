@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { handleMidtransNotification } from "@/lib/payment";
+import { TierService } from "@/lib/services/TierService";
 import crypto from "crypto";
 
 export async function POST(req: Request) {
@@ -29,7 +30,16 @@ export async function POST(req: Request) {
     }
 
     const payload = JSON.parse(rawBody);
-    await handleMidtransNotification(payload);
+    const orderId = payload.order_id as string;
+
+    // Check if this is a tier upgrade order (T-xxx or TIER-xxx)
+    if (orderId && (orderId.startsWith("TIER-") || orderId.startsWith("T-"))) {
+      console.log("[Midtrans Webhook] Processing tier upgrade order:", orderId);
+      await TierService.handleUpgradeNotification(payload);
+    } else {
+      // Regular product order
+      await handleMidtransNotification(payload);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -119,6 +119,7 @@ export default function StudentExamPage() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const tabWarningCountRef = useRef(0);
+  const audioPlayPromiseRef = useRef<Promise<void> | null>(null);
 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [current, setCurrent] = useState(0);
@@ -127,6 +128,7 @@ export default function StudentExamPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [audioProgress, setAudioProgress] = useState(0);
   const [sectionTimeLeft, setSectionTimeLeft] = useState(SECTION_TIME_LIMITS.LISTENING);
   const [currentSection, setCurrentSection] = useState("LISTENING");
   const [isOnline, setIsOnline] = useState(true);
@@ -210,19 +212,52 @@ export default function StudentExamPage() {
   }, [answers, router]);
 
   // ============== FULLSCREEN ENFORCEMENT ==============
-  const enterFullscreen = useCallback(() => {
+  // Audio URL for fullscreen resume (computed from current question)
+  const currentAudioUrl = question?.audioUrl;
+
+  const enterFullscreen = useCallback(async () => {
     const el = document.documentElement;
+
     if (el.requestFullscreen) {
-      el.requestFullscreen().then(() => {
+      // Request fullscreen immediately without waiting
+      const fullscreenPromise = el.requestFullscreen();
+
+      // Create session in background (don't await)
+      fetch("/api/student/exam-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      }).then(sessionRes => sessionRes.json()).then(sessionData => {
+        if (sessionData.success && sessionData.session?.id) {
+          setSessionId(sessionData.session.id);
+        }
+      }).catch(err => {
+        console.error("Failed to create exam session:", err);
+      });
+
+      // Log activity immediately
+      logActivity("FULLSCREEN_ENTER", { timestamp: new Date().toISOString() });
+
+      fullscreenPromise.then(() => {
         setIsFullscreen(true);
         setShowFullscreenPrompt(false);
         setIsSecureMode(true);
-        logActivity("FULLSCREEN_ENTER", { timestamp: new Date().toISOString() });
+
+        // Resume audio if it was playing (browser pauses it during fullscreen transition)
+        setTimeout(() => {
+          const audio = audioRef.current;
+          if (audio && currentAudioUrl) {
+            audio.src = currentAudioUrl;
+            audio.load();
+            audio.play().then(() => {
+              setIsPlaying(true);
+            }).catch(() => {});
+          }
+        }, 200);
       }).catch(() => {
         setShowFullscreenPrompt(true);
       });
     }
-  }, [logActivity]);
+  }, [logActivity, currentAudioUrl]);
 
   const handleFullscreenChange = useCallback(() => {
     const fullscreenElement = document.fullscreenElement;
@@ -383,6 +418,9 @@ export default function StudentExamPage() {
 
   // ============== AUTO-SAVE ==============
   const saveProgress = useCallback(async () => {
+    // Only save if we have a session ID
+    if (!sessionId) return;
+
     if (!isOnline) {
       setSyncStatus("offline");
       return;
@@ -406,7 +444,7 @@ export default function StudentExamPage() {
     } catch {
       setSyncStatus("offline");
     }
-  }, [answers, currentSection, sectionTimeLeft, isOnline, question?.id]);
+  }, [answers, currentSection, sectionTimeLeft, isOnline, question?.id, sessionId]);
 
   useEffect(() => {
     if (Object.keys(answers).length > 0) {
@@ -475,17 +513,119 @@ export default function StudentExamPage() {
       });
   }, []);
 
+  // Audio playback control with better error handling
+  const toggleAudio = async () => {
+    if (!audioRef.current) {
+      console.warn("Audio element not ready");
+      return;
+    }
+    try {
+      // Cancel any pending play operation
+      if (audioPlayPromiseRef.current) {
+        audioPlayPromiseRef.current = null;
+      }
+
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        audioPlayPromiseRef.current = audioRef.current.play();
+        await audioPlayPromiseRef.current;
+        setIsPlaying(true);
+        audioPlayPromiseRef.current = null;
+      }
+    } catch (err: any) {
+      // Ignore AbortError - happens when switching questions
+      if (err.name !== "AbortError") {
+        console.warn("Audio toggle error:", err);
+      }
+      setIsPlaying(false);
+      audioPlayPromiseRef.current = null;
+    }
+  };
+
   // Auto-play audio for LISTENING
   useEffect(() => {
-    if (question?.audioUrl && audioRef.current) {
-      audioRef.current.src = question.audioUrl;
-    }
+    // Reset playing state when question changes
+    setIsPlaying(false);
+    setAudioProgress(0);
+
+    if (!question?.audioUrl || !audioRef.current) return;
+
+    const audio = audioRef.current;
+
+    // Cancel any pending play operation
+    audioPlayPromiseRef.current = null;
+
+    // Create a promise that we can track
+    const loadAndPlay = async () => {
+      try {
+        audio.src = question.audioUrl!;
+        audio.load();
+
+        // Wait a bit for load to start
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        audioPlayPromiseRef.current = audio.play();
+
+        await audioPlayPromiseRef.current;
+        setIsPlaying(true);
+      } catch (err: any) {
+        // Ignore AbortError - happens when switching questions rapidly
+        if (err.name !== "AbortError") {
+          console.log("Autoplay prevented:", err.message);
+        }
+        setIsPlaying(false);
+      } finally {
+        audioPlayPromiseRef.current = null;
+      }
+    };
+
+    const timer = setTimeout(loadAndPlay, 150);
+    return () => {
+      clearTimeout(timer);
+      audioPlayPromiseRef.current = null;
+    };
   }, [current, question]);
 
+  // Audio progress tracking
   useEffect(() => {
-    setIsPlaying(false);
-    if (audioRef.current) {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handleTimeUpdate = () => {
+      if (audio.duration) {
+        const progress = (audio.currentTime / audio.duration) * 100;
+        setAudioProgress(progress);
+      }
+    };
+
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setAudioProgress(100);
+    };
+
+    const handleError = (e: Event) => {
+      console.error("Audio error:", e);
+      setIsPlaying(false);
+    };
+
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("error", handleError);
+
+    return () => {
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("error", handleError);
+    };
+  }, []);
+
+  useEffect(() => {
+    // Reset when section changes (only pause, don't reset progress)
+    if (audioRef.current && isPlaying) {
       audioRef.current.pause();
+      setIsPlaying(false);
     }
   }, [currentSection]);
 
@@ -562,6 +702,8 @@ export default function StudentExamPage() {
   if (showFullscreenPrompt && availableCredits !== null && availableCredits > 0) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-blue-50 p-4">
+        {/* Hidden audio element - mounted early for fullscreen transition */}
+        <audio ref={audioRef} className="hidden" />
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -656,6 +798,17 @@ export default function StudentExamPage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+      {/* Hidden audio element - always mounted */}
+      <audio
+        ref={audioRef}
+        onEnded={() => {
+          setIsPlaying(false);
+          setAudioProgress(100);
+        }}
+        onError={(e) => console.error("Audio load error:", e)}
+        className="hidden"
+      />
+
       {/* Tab Switch Warning Overlay */}
       <AnimatePresence>
         {showTabWarning && (
@@ -951,16 +1104,7 @@ export default function StudentExamPage() {
                       <div className="flex items-center gap-4">
                         <motion.button
                           whileTap={{ scale: 0.95 }}
-                          onClick={() => {
-                            if (audioRef.current) {
-                              if (isPlaying) {
-                                audioRef.current.pause();
-                              } else {
-                                audioRef.current.play();
-                              }
-                              setIsPlaying(!isPlaying);
-                            }
-                          }}
+                          onClick={toggleAudio}
                           className="h-12 w-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg text-white"
                         >
                           {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 ml-0.5" />}
@@ -969,8 +1113,15 @@ export default function StudentExamPage() {
                           <div className="flex items-center gap-2 mb-1">
                             <Volume2 className="h-4 w-4 text-purple-600" />
                             <span className="text-sm font-medium text-purple-700">Audio Question</span>
+                            <span className="text-xs text-purple-500">{isPlaying ? "Playing..." : "Paused"}</span>
                           </div>
-                          <audio ref={audioRef} onEnded={() => setIsPlaying(false)} className="hidden" />
+                          {/* Audio progress bar */}
+                          <div className="h-1.5 bg-purple-200 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-purple-600 rounded-full transition-all duration-100"
+                              style={{ width: `${audioProgress}%` }}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>

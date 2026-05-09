@@ -53,7 +53,7 @@ export async function POST(req: Request) {
     return NextResponse.redirect(new URL("/student/dashboard?error=email", req.url));
   }
 
-  const hashed = await bcrypt.hash(password, 10);
+  const hashed = await bcrypt.hash(password, 12);
 
   const user = await prisma.user.create({
     data: {

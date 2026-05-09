@@ -18,6 +18,7 @@ import prisma from "./prisma";
 import { generateAccessToken } from "./generateAccessToken";
 import { OrderStatus, ProductType } from "@/generated/prisma/enums";
 import { sendOrderConfirmation } from "./email";
+import { TierServiceClass } from "./services/TierService";
 
 /**
  * Format date for Midtrans expiry
@@ -270,9 +271,19 @@ async function fulfillOrder(order: {
     data: { status: OrderStatus.COMPLETED },
   });
 
-  // Calculate and record admin fee (5%)
+  // Get seller tier for platform fee calculation
+  const seller = await prisma.user.findUnique({
+    where: { id: order.product.userId },
+    select: { sellerTier: true, customFeeRate: true },
+  });
+
+  // Calculate platform fee based on seller tier (or custom override)
   const price = order.product.promoPrice || order.product.price;
-  const fee = Math.floor(price * 0.05);
+  const feeRate = TierServiceClass.getEffectiveFee({
+    sellerTier: seller?.sellerTier || "FREE",
+    customFeeRate: seller?.customFeeRate ?? null,
+  });
+  const fee = Math.floor(price * (feeRate / 100));
 
   await prisma.adminPlatformFee.create({
     data: {
@@ -355,6 +366,29 @@ async function fulfillOrder(order: {
     } catch (emailError) {
       console.error("[Midtrans] Failed to send confirmation email:", emailError);
     }
+  }
+
+  // ============ INTEGRATION HOOKS ============
+
+  // 1. Auto-create/update customer
+  try {
+    const { upsertCustomerFromOrder } = await import("@/lib/services/customerService");
+    await upsertCustomerFromOrder(order.product.userId, {
+      buyerName: order.buyerName,
+      buyerEmail: order.buyerEmail,
+      buyerWhatsapp: order.buyerWhatsapp,
+      productPrice: price,
+    });
+  } catch (customerError) {
+    console.error("[Midtrans] Failed to create customer:", customerError);
+  }
+
+  // 2. Trigger webhook for order completed
+  try {
+    const { onOrderCompleted } = await import("@/lib/services/webhookService");
+    await onOrderCompleted(order.id);
+  } catch (webhookError) {
+    console.error("[Midtrans] Failed to trigger webhook:", webhookError);
   }
 }
 

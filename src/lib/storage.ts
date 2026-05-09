@@ -48,16 +48,11 @@ interface StorageConfig {
 
 // Get config from environment
 function getConfig(): StorageConfig {
-  // For local storage, use public/uploads for Next.js static serving
-  const localStorageBase = process.env.NODE_ENV === "production"
-    ? "./public/uploads"
-    : "./public/uploads";
-
   return {
     provider: (process.env.STORAGE_PROVIDER as StorageProvider) || "local",
     // Local
-    localPath: process.env.LOCAL_STORAGE_PATH || localStorageBase,
-    localBaseUrl: process.env.LOCAL_STORAGE_BASE_URL || "/uploads",
+    localPath: process.env.LOCAL_STORAGE_PATH || "./public/upload",
+    localBaseUrl: process.env.LOCAL_STORAGE_BASE_URL || "/upload",
     // Cloudflare R2
     r2AccountId: process.env.CLOUDFLARE_R2_ACCOUNT_ID,
     r2AccessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID,

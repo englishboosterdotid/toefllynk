@@ -10,6 +10,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AnimatedContainer } from "@/components/animations";
 
+// Reserved usernames that conflict with app routes
+const RESERVED_USERNAMES = [
+  "admin", "user", "users", "student", "students", "api", "auth", "login",
+  "logout", "register", "signup", "dashboard", "settings", "profile",
+  "products", "orders", "withdrawal", "withdrawals", "affiliate",
+  "subscription", "seller", "sellers", "microsite", "www", "app", "help",
+  "support", "about", "contact", "pricing", "blog", "news", "oauth",
+  "callback", "webhook", "webhooks", "midtrans", "xendit", "blog"
+];
+
 export default function RegisterPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -21,6 +31,9 @@ export default function RegisterPage() {
     password: "",
   });
   const [error, setError] = useState("");
+  const [usernameError, setUsernameError] = useState("");
+
+  const isReservedUsername = form.username.length >= 3 && RESERVED_USERNAMES.includes(form.username.toLowerCase());
 
   const passwordRequirements = [
     { label: "Minimal 8 karakter", met: form.password.length >= 8 },
@@ -35,6 +48,11 @@ export default function RegisterPage() {
 
     if (!allRequirementsMet) {
       setError("Password tidak memenuhi syarat");
+      return;
+    }
+
+    if (isReservedUsername) {
+      setError("Username ini tidak tersedia");
       return;
     }
 
@@ -136,13 +154,25 @@ export default function RegisterPage() {
                   id="username"
                   type="text"
                   placeholder="johndoe"
-                  className="pl-12"
+                  className={`pl-12 ${isReservedUsername ? "border-red-500 focus:border-red-500" : ""}`}
                   value={form.username}
-                  onChange={(e) => setForm({ ...form, username: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '') })}
+                  onChange={(e) => {
+                    const val = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    setForm({ ...form, username: val });
+                    if (RESERVED_USERNAMES.includes(val)) {
+                      setUsernameError("Username ini tidak tersedia");
+                    } else {
+                      setUsernameError("");
+                    }
+                  }}
                   required
                 />
               </div>
-              <p className="text-xs text-slate-400">Username akan menjadi link microsite Anda: toefllynk.com/{form.username || "username"}</p>
+              {usernameError || isReservedUsername ? (
+                <p className="text-xs text-red-500">{usernameError || "Username ini tidak tersedia"}</p>
+              ) : (
+                <p className="text-xs text-slate-400">Username akan menjadi link microsite Anda: toefllynk.com/{form.username || "username"}</p>
+              )}
             </div>
 
             <div className="space-y-2">

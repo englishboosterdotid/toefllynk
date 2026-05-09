@@ -1,10 +1,17 @@
 import prisma from "@/lib/prisma";
 import { requireUser } from "@/lib/requireUser";
+import { deleteStorageFile } from "@/lib/fileCleanup";
 
 export async function POST(req: Request) {
   try {
     const formData = await req.formData();
     const user = await requireUser();
+
+    // Get current user to check for avatar cleanup
+    const currentUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { avatar: true },
+    });
 
     const data = {
       headline: formData.get("headline") as string || null,
@@ -18,6 +25,11 @@ export async function POST(req: Request) {
       where: { id: user.id },
       data,
     });
+
+    // Clean up old avatar if changed
+    if (currentUser?.avatar && currentUser.avatar !== data.avatar) {
+      await deleteStorageFile(currentUser.avatar);
+    }
 
     return Response.redirect(new URL("/user/microsite?success=1", req.url));
   } catch (error: any) {

@@ -1,9 +1,10 @@
 import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Award, ArrowLeft, Download, BarChart3, CheckCircle2, BookOpen, Eye } from "lucide-react";
+import { Award, ArrowLeft, BarChart3, BookOpen } from "lucide-react";
 import { getStudentSession } from "@/lib/getStudentSession";
 import { getSession } from "@/lib/session";
+import { StudentResultActions } from "@/components/StudentResultActions";
 
 export default async function StudentResultPage({
   params,
@@ -205,33 +206,11 @@ export default async function StudentResultPage({
         </div>
 
         {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          {result.product?.reviewIncluded && (
-            <Link
-              href={`/student/result/${result.id}/review`}
-              className="inline-flex items-center justify-center gap-2 bg-green-600 text-white px-8 py-4 rounded-xl font-medium hover:bg-green-700 transition-colors"
-            >
-              <Eye className="h-5 w-5" />
-              Review Jawaban
-            </Link>
-          )}
-
-          <Link
-            href={`/api/student-certificate/${result.id}`}
-            className="inline-flex items-center justify-center gap-2 bg-blue-600 text-white px-8 py-4 rounded-xl font-medium hover:bg-blue-700 transition-colors"
-          >
-            <Download className="h-5 w-5" />
-            Download E-Certificate
-          </Link>
-
-          <Link
-            href="/student/exam"
-            className="inline-flex items-center justify-center gap-2 bg-slate-100 text-slate-700 px-8 py-4 rounded-xl font-medium hover:bg-slate-200 transition-colors"
-          >
-            <CheckCircle2 className="h-5 w-5" />
-            Try Again
-          </Link>
-        </div>
+        <StudentResultActions
+          resultId={result.id}
+          studentName={result.student.buyerName}
+          reviewIncluded={!!result.product?.reviewIncluded}
+        />
 
         {/* Tips */}
         <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6">

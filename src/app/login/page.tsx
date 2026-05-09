@@ -37,7 +37,12 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (data.success) {
-        window.location.href = "/user";
+        // Redirect based on role
+        if (data.user?.role === "ADMIN") {
+          router.push("/admin");
+        } else {
+          router.push("/user");
+        }
       } else {
         setError(data.message || "Login gagal");
       }

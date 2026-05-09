@@ -1,37 +1,30 @@
-import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { ProductType, PackageType } from "@/generated/prisma/enums";
 import { requireAdmin } from "@/lib/requireAdmin";
+import { productRepository } from "@/lib/repositories";
 
 export async function GET(req: Request) {
   try {
     await requireAdmin();
-    
+
     const { searchParams } = new URL(req.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
     const limit = Math.max(1, Math.min(50, parseInt(searchParams.get("limit") || "20")));
-    const skip = (page - 1) * limit;
 
-    const [products, total] = await Promise.all([
-      prisma.product.findMany({
-        skip,
-        take: limit,
-        orderBy: { createdAt: "desc" },
-        include: {
-          user: { select: { id: true, name: true, email: true } },
-        },
-      }),
-      prisma.product.count(),
-    ]);
+    const result = await productRepository.findAllWithUsers({
+      page,
+      limit,
+      orderBy: { createdAt: "desc" },
+    });
 
-    return NextResponse.json({ 
-      success: true, 
-      products,
+    return NextResponse.json({
+      success: true,
+      products: result.data,
       pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+        page: result.page,
+        limit: result.limit,
+        total: result.total,
+        totalPages: result.totalPages,
       }
     });
   } catch (error: any) {
@@ -98,26 +91,34 @@ export async function POST(req: Request) {
       );
     }
 
-    const product = await prisma.product.create({
-      data: {
-        userId,
-        title,
-        description,
-        price: parsedPrice,
-        promoPrice: parsedPromoPrice,
-        thumbnail,
-        checkoutLink,
-        category,
-        productType: productType || "TOEFL_SIMULATION",
-        packageType,
-        examCredits: parsedExamCredits,
-        certificateIncluded: certificateIncluded ?? true,
-        reviewIncluded: reviewIncluded ?? false,
-        zoomIncluded: zoomIncluded ?? false,
-        affiliateEnabled: affiliateEnabled ?? false,
-        affiliateCommission: parseInt(affiliateCommission) || 10,
-      },
+    const product = await productRepository.create({
+      userId,
+      title,
+      description,
+      price: parsedPrice,
+      promoPrice: parsedPromoPrice,
+      thumbnail,
+      checkoutLink,
+      category,
+      productType: productType || "TOEFL_SIMULATION",
+      packageType,
+      examCredits: parsedExamCredits,
+      certificateIncluded: certificateIncluded ?? true,
+      reviewIncluded: reviewIncluded ?? false,
+      zoomIncluded: zoomIncluded ?? false,
+      affiliateEnabled: affiliateEnabled ?? false,
     });
+
+    // Create default affiliate enrollment with commission
+    if (affiliateEnabled && userId) {
+      const { createAffiliateEnrollment } = await import("@/lib/services/affiliateService");
+      await createAffiliateEnrollment({
+        affiliateUserId: userId,
+        ownerUserId: userId,
+        productId: product.id,
+        commissionPercent: parseInt(affiliateCommission) || 10,
+      });
+    }
 
     return NextResponse.json({
       success: true,

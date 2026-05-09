@@ -1,0 +1,11 @@
+export { BaseRepository, type PaginationOptions, type PaginatedResult } from "./base.repository";
+export { UserRepository, userRepository, type UserPublic, type UserWithStudent } from "./user.repository";
+export { ProductRepository, productRepository, type ProductWithUser, type ProductBasic } from "./product.repository";
+export { OrderRepository, orderRepository, type OrderWithDetails, type OrderBasic } from "./order.repository";
+export { StudentRepository, studentRepository, type StudentBasic, type StudentWithCredits } from "./student.repository";
+export { CustomerRepository, customerRepository, type CustomerBasic } from "./customer.repository";
+export { ApiKeyRepository, apiKeyRepository, type ApiKeyBasic } from "./apiKey.repository";
+export { WebhookRepository, webhookRepository, type WebhookBasic, type WebhookDeliveryBasic } from "./webhook.repository";
+export { AnalyticsRepository, analyticsRepository, type ProductViewBasic } from "./analytics.repository";
+export { EmailCampaignRepository, emailCampaignRepository, type CampaignBasic } from "./emailCampaign.repository";
+export { SupportRepository, supportRepository, type TicketBasic } from "./support.repository";

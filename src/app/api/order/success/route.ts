@@ -1,7 +1,9 @@
-import prisma from "@/lib/prisma";
 import { generateAccessToken } from "@/lib/generateAccessToken";
 import { OrderStatus, ProductType } from "@/generated/prisma/enums";
 import { getSession } from "@/lib/session";
+import { orderRepository, studentRepository } from "@/lib/repositories";
+import prisma from "@/lib/prisma";
+import { TierServiceClass } from "@/lib/services/TierService";
 
 export async function POST(req: Request) {
   const formData = await req.formData();
@@ -13,52 +15,54 @@ export async function POST(req: Request) {
     return Response.redirect(new URL("/login", req.url));
   }
 
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    include: {
-      product: true,
-      affiliateConversion: true,
-      student: true,
-    },
-  });
+  const order = await orderRepository.findById(orderId);
 
   if (!order) {
     return Response.redirect(new URL("/user/orders", req.url));
   }
 
   // Verify the order belongs to this user or user owns the product
-  if (order.buyerEmail !== session.email && order.product.userId !== session.userId) {
+  if (order.buyerEmail !== session.email && order.product.user.id !== session.userId) {
     return Response.redirect(new URL("/user/orders", req.url));
   }
 
   // IDEMPOTENT GUARD
   if (order.status === OrderStatus.COMPLETED) {
-    if (order.product.productType === ProductType.TOEFL_SIMULATION) {
-      const existingStudent = await prisma.studentAccount.findUnique({
-        where: {
-          buyerEmail: order.buyerEmail,
-        },
+    if (order.product && order.product.user) {
+      const ownerUser = await prisma.user.findUnique({
+        where: { id: order.product.user.id },
+        select: { sellerTier: true },
       });
 
-      if (existingStudent) {
-        return Response.redirect(
-          new URL(`/user/student-access/${existingStudent.id}`, req.url)
-        );
+      if (ownerUser?.sellerTier === "FREE" || order.product.examCredits > 0) {
+        const existingStudent = await studentRepository.findByEmail(order.buyerEmail);
+
+        if (existingStudent) {
+          return Response.redirect(
+            new URL(`/user/student-access/${existingStudent.id}`, req.url)
+          );
+        }
       }
     }
 
     return Response.redirect(new URL("/user/orders", req.url));
   }
 
-  await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      status: OrderStatus.COMPLETED,
-    },
+  await orderRepository.updateStatus(orderId, OrderStatus.COMPLETED);
+
+  // Get seller tier for platform fee calculation
+  const seller = await prisma.user.findUnique({
+    where: { id: order.product?.user?.id || "" },
+    select: { sellerTier: true, customFeeRate: true },
   });
 
-  // ADMIN PLATFORM FEE
-  const fee = Math.floor((order.product.promoPrice || order.product.price) * 0.05);
+  // Calculate platform fee based on seller tier
+  const price = order.product?.promoPrice || order.product?.price || 0;
+  const feeRate = TierServiceClass.getEffectiveFee({
+    sellerTier: seller?.sellerTier || "FREE",
+    customFeeRate: seller?.customFeeRate ?? null,
+  });
+  const fee = Math.floor(price * (feeRate / 100));
 
   await prisma.adminPlatformFee.create({
     data: {
@@ -76,10 +80,7 @@ export async function POST(req: Request) {
     });
 
     if (enrollment) {
-      const commission = Math.floor(
-        (order.product.promoPrice || order.product.price) *
-          (enrollment.commissionPercent / 100)
-      );
+      const commission = Math.floor(price * (enrollment.commissionPercent / 100));
 
       await prisma.affiliateConversion.create({
         data: {
@@ -94,36 +95,25 @@ export async function POST(req: Request) {
   }
 
   // ===== TOEFL SIMULATION FULFILLMENT =====
-  if (order.product.productType === ProductType.TOEFL_SIMULATION) {
-    let student = await prisma.studentAccount.findUnique({
-      where: {
-        buyerEmail: order.buyerEmail,
-      },
-    });
+  if (order.product?.user?.id) {
+    let student = await studentRepository.findByEmail(order.buyerEmail);
 
     if (!student) {
-      student = await prisma.studentAccount.create({
-        data: {
-          buyerName: order.buyerName,
-          buyerEmail: order.buyerEmail,
-          buyerWhatsapp: order.buyerWhatsapp || null,
-          accessToken: generateAccessToken(),
-          ownerUserId: order.product.userId,
-        },
+      student = await studentRepository.create({
+        buyerName: order.buyerName,
+        buyerEmail: order.buyerEmail,
+        buyerWhatsapp: order.buyerWhatsapp || null,
+        accessToken: generateAccessToken(),
+        ownerUserId: order.product.user.id,
       });
     }
 
-    await prisma.order.update({
-      where: { id: order.id },
-      data: {
-        studentId: student.id,
-      },
-    });
+    await orderRepository.linkStudent(order.id, student.id);
 
     await prisma.studentExamCredit.create({
       data: {
         studentId: student.id,
-        totalCredit: order.product.examCredits,
+        totalCredit: order.product.examCredits || 1,
         productId: order.product.id,
       },
     });

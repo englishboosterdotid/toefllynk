@@ -22,6 +22,7 @@ export default async function UserLayout({
         avatar: user.avatar,
         role: user.role,
         hasStudentAccount: user.hasStudentAccount,
+        sellerTier: user.sellerTier,
       }}
     >
       {children}

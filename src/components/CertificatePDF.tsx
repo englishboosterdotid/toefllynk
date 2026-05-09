@@ -1,6 +1,16 @@
-"use client";
-
 import { Document, Page, Text, View, StyleSheet, Image, Font } from "@react-pdf/renderer";
+
+interface CustomTemplate {
+  title: string;
+  subtitle: string;
+  showLogo: boolean;
+  logoUrl: string | null;
+  signatureText: string;
+  footerText: string | null;
+  fontFamily: string;
+  backgroundImage: string | null;
+  validityDays: number | null;
+}
 
 interface ExamResult {
   id: string;
@@ -19,204 +29,195 @@ interface StudentAccount {
   buyerEmail: string | null;
 }
 
-// Register fonts
 Font.register({
   family: "Inter",
   fonts: [
-    { src: "https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hjp-Ek-_EeA.woff", fontWeight: 400 },
-    { src: "https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuGKYAZ9hjp-Ek-_EeA.woff", fontWeight: 700 },
+    {
+      src: "https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hjp-Ek-_EeA.woff",
+      fontWeight: 400,
+    },
+    {
+      src: "https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuGKYAZ9hjp-Ek-_EeA.woff",
+      fontWeight: 700,
+    },
   ],
 });
 
 const styles = StyleSheet.create({
   page: {
-    flexDirection: "column",
-    backgroundColor: "#FFFFFF",
-    padding: 40,
+    position: "relative",
+    backgroundColor: "#ffffff",
+    fontFamily: "Inter",
+    width: 842,
+    height: 595,
   },
+
+  backgroundImage: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: 842,
+    height: 595,
+    zIndex: -1,
+  },
+
+  container: {
+    position: "relative",
+    margin: 24,
+    padding: 30,
+    height: "90%",
+    justifyContent: "space-between",
+  },
+
   header: {
     alignItems: "center",
-    marginBottom: 30,
+    marginBottom: 5,
   },
-  title: {
-    fontSize: 32,
-    fontFamily: "Inter",
-    fontWeight: 700,
-    color: "#1e3a5f",
+
+  logo: {
+    width: 60,
+    height: 60,
     marginBottom: 8,
+    objectFit: "contain",
   },
-  subtitle: {
-    fontSize: 16,
-    color: "#64748b",
+
+  title: {
+    fontSize: 26,
+    fontWeight: 700,
     marginBottom: 4,
   },
+
+  subtitle: {
+    fontSize: 13,
+    letterSpacing: 2,
+  },
+
   badge: {
-    backgroundColor: "#3b82f6",
-    paddingHorizontal: 16,
-    paddingVertical: 6,
+    marginTop: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
     borderRadius: 20,
-    marginTop: 12,
   },
+
   badgeText: {
-    fontSize: 12,
-    color: "#ffffff",
+    fontSize: 10,
     fontWeight: 700,
   },
-  certificateBody: {
+
+  body: {
     alignItems: "center",
-    flex: 1,
-    justifyContent: "center",
+    marginTop: 10,
   },
-  presentedTo: {
-    fontSize: 14,
-    color: "#64748b",
-    marginBottom: 8,
+
+  presentedText: {
+    fontSize: 12,
+    marginBottom: 6,
   },
+
   studentName: {
-    fontSize: 36,
-    fontFamily: "Inter",
+    fontSize: 30,
     fontWeight: 700,
-    color: "#0f172a",
-    marginBottom: 20,
-    borderBottom: "2px solid #e2e8f0",
-    paddingBottom: 8,
-    paddingHorizontal: 40,
+    paddingBottom: 5,
+    paddingHorizontal: 20,
+    marginBottom: 14,
   },
+
   description: {
-    fontSize: 14,
-    color: "#475569",
+    fontSize: 11,
     textAlign: "center",
-    maxWidth: 400,
-    lineHeight: 1.6,
-    marginBottom: 30,
+    maxWidth: 420,
+    lineHeight: 1.5,
+    marginBottom: 18,
   },
+
   scoreSection: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 20,
-    marginVertical: 30,
+    gap: 10,
+    marginTop: 10,
   },
+
   scoreBox: {
     alignItems: "center",
-    padding: 20,
-    backgroundColor: "#f8fafc",
-    borderRadius: 12,
-    minWidth: 100,
+    backgroundColor: "#ffffff",
+    borderRadius: 10,
+    padding: 10,
+    minWidth: 70,
   },
-  scoreValue: {
-    fontSize: 42,
-    fontFamily: "Inter",
-    fontWeight: 700,
-    color: "#3b82f6",
-  },
-  scoreLabel: {
-    fontSize: 10,
-    color: "#64748b",
-    marginTop: 4,
-  },
-  mainScore: {
-    alignItems: "center",
-    padding: 24,
-    backgroundColor: "#1e3a5f",
-    borderRadius: 16,
-    minWidth: 160,
-  },
-  mainScoreValue: {
-    fontSize: 56,
-    fontFamily: "Inter",
-    fontWeight: 700,
-    color: "#ffffff",
-  },
-  mainScoreLabel: {
-    fontSize: 12,
-    color: "#94a3b8",
-    marginTop: 4,
-  },
-  sectionScores: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 16,
-    marginTop: 20,
-  },
-  sectionItem: {
-    alignItems: "center",
-    padding: 12,
-    backgroundColor: "#f1f5f9",
-    borderRadius: 8,
-    minWidth: 80,
-  },
+
   sectionValue: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 700,
-    color: "#0f172a",
   },
+
   sectionLabel: {
-    fontSize: 9,
+    fontSize: 8,
+    marginTop: 2,
+  },
+
+  totalBox: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    minWidth: 120,
+  },
+
+  totalValue: {
+    fontSize: 40,
+    fontWeight: 700,
+  },
+
+  totalLabel: {
+    fontSize: 10,
+  },
+
+  qrTopLeft: {
+    position: "absolute",
+    top: 50,
+    left: 50,
+    alignItems: "center",
+  },
+
+  qrCode: {
+    width: 60,
+    height: 60,
+  },
+
+  qrText: {
+    fontSize: 8,
     color: "#64748b",
     marginTop: 2,
   },
+
   footer: {
     flexDirection: "row",
-    alignItems: "flex-end",
     justifyContent: "space-between",
-    marginTop: 40,
-    paddingTop: 20,
-    borderTop: "1px solid #e2e8f0",
-  },
-  dateSection: {
-    alignItems: "flex-start",
-  },
-  dateLabel: {
-    fontSize: 10,
-    color: "#64748b",
-    marginBottom: 4,
-  },
-  dateValue: {
-    fontSize: 12,
-    color: "#0f172a",
-    fontWeight: 700,
-  },
-  qrSection: {
-    alignItems: "center",
-  },
-  qrLabel: {
-    fontSize: 8,
-    color: "#64748b",
-    marginBottom: 4,
-    textAlign: "center",
-  },
-  qrCode: {
-    width: 80,
-    height: 80,
-  },
-  signature: {
     alignItems: "flex-end",
+    marginTop: 20,
   },
-  signatureLine: {
-    borderBottom: "1px solid #0f172a",
-    width: 120,
-    marginBottom: 4,
+
+  footerLeft: {},
+
+  footerLabel: {
+    fontSize: 8,
   },
-  signatureLabel: {
-    fontSize: 10,
-    color: "#64748b",
-  },
-  watermark: {
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: "translate(-50%, -50%) rotate(-30deg)",
-    fontSize: 80,
-    color: "#f1f5f9",
-    opacity: 0.5,
+
+  footerValue: {
+    fontSize: 11,
     fontWeight: 700,
+    marginTop: 2,
   },
-  border: {
-    border: "2px solid #3b82f6",
-    margin: 20,
-    padding: 40,
-    borderRadius: 16,
+
+  validityText: {
+    fontSize: 8,
+    marginTop: 4,
+  },
+
+  footerTextCustom: {
+    fontSize: 8,
+    marginTop: 4,
   },
 });
 
@@ -225,82 +226,212 @@ interface CertificateProps {
     student: StudentAccount;
   };
   qrCodeDataUrl: string;
+  backgroundImage?: string | null;
+  customTemplate?: CustomTemplate | null;
+  logoUrl?: string | null;
 }
 
-export function CertificatePDF({ result, qrCodeDataUrl }: CertificateProps) {
+// Default colors
+const DEFAULT_COLORS = {
+  primaryColor: "#1e3a5f",
+  accentColor: "#2563eb",
+};
+
+export function CertificatePDF({ result, qrCodeDataUrl, backgroundImage, customTemplate, logoUrl }: CertificateProps) {
   const date = new Date(result.createdAt);
+
   const formattedDate = date.toLocaleDateString("id-ID", {
     day: "numeric",
     month: "long",
     year: "numeric",
   });
 
-  const getScoreCategory = (score: number) => {
-    if (score >= 550) return { label: "Excellent", color: "#10b981" };
-    if (score >= 500) return { label: "Good", color: "#3b82f6" };
-    if (score >= 450) return { label: "Average", color: "#f59e0b" };
-    return { label: "Needs Improvement", color: "#ef4444" };
+  // Calculate validity date if validityDays is set
+  const validityDays = customTemplate?.validityDays;
+  let validityText: string | null = null;
+  if (validityDays && validityDays > 0) {
+    const validUntil = new Date(date);
+    validUntil.setDate(validUntil.getDate() + validityDays);
+    validityText = `Valid until ${validUntil.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}`;
+  }
+
+  const getCategory = (score: number) => {
+    if (score >= 550) return { label: "EXCELLENT", bgColor: "#059669", textColor: "#ffffff" }; // green
+    if (score >= 500) return { label: "GOOD", bgColor: "#2563eb", textColor: "#ffffff" }; // blue
+    if (score >= 450) return { label: "AVERAGE", bgColor: "#d97706", textColor: "#ffffff" }; // orange
+    return { label: "NEEDS IMPROVEMENT", bgColor: "#dc2626", textColor: "#ffffff" }; // red
   };
 
-  const category = getScoreCategory(result.totalScore);
+  // Default colors
+  const primaryColor = DEFAULT_COLORS.primaryColor;
+  const accentColor = DEFAULT_COLORS.accentColor;
+
+  // Always use dark text for better visibility on white/light backgrounds
+  const textColor = primaryColor;
+  const lightTextColor = "#64748b";
+  const borderColor = primaryColor;
+
+  // Get category with colors
+  const category = getCategory(result.totalScore);
+
+  // Dynamic styles based on colors
+  const dynamicStyles = {
+    title: { color: textColor },
+    subtitle: { color: lightTextColor },
+    badge: { backgroundColor: category.bgColor },
+    badgeText: { color: category.textColor },
+    presentedText: { color: lightTextColor },
+    studentName: { color: textColor, borderBottom: `3px solid ${borderColor}` },
+    description: { color: lightTextColor },
+    scoreBox: {
+      backgroundColor: "#ffffff",
+      borderWidth: 1,
+      borderColor: "#e2e8f0",
+    },
+    totalBox: { backgroundColor: category.bgColor },
+    totalValue: { color: category.textColor },
+    totalLabel: { color: "rgba(255,255,255,0.8)" },
+    footerLabel: { color: lightTextColor },
+    footerValue: { color: textColor },
+    qrText: { color: lightTextColor },
+  };
 
   return (
     <Document>
-      <Page size="A4" orientation="landscape" style={styles.page}>
-        <View style={styles.border}>
+      <Page
+        size="A4"
+        orientation="landscape"
+        wrap={false}
+        style={styles.page}
+      >
+        {/* Background - must be first to render behind content */}
+        {backgroundImage && (
+          <Image
+            src={backgroundImage}
+            style={styles.backgroundImage}
+          />
+        )}
+
+        {/* QR Code - Bottom Right Corner */}
+        <View style={styles.qrTopLeft}>
+          <Image
+            src={qrCodeDataUrl}
+            style={styles.qrCode}
+          />
+          <Text style={styles.qrText}>
+            Scan to verify
+          </Text>
+        </View>
+
+        {/* Main Container */}
+        <View style={styles.container}>
+
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>TOEFL ITP Simulation</Text>
-            <Text style={styles.subtitle}>Certificate of Completion</Text>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{category.label.toUpperCase()}</Text>
+            {logoUrl && (
+              <Image
+                src={logoUrl}
+                style={styles.logo}
+              />
+            )}
+
+            <Text style={[styles.title, dynamicStyles.title]}>
+              {customTemplate?.title || "TOEFL ITP Simulation"}
+            </Text>
+
+            <Text style={[styles.subtitle, dynamicStyles.subtitle]}>
+              {customTemplate?.subtitle || "Certificate of Completion"}
+            </Text>
+
+            <View style={[styles.badge, dynamicStyles.badge]}>
+              <Text style={[styles.badgeText, dynamicStyles.badgeText]}>
+                {category.label}
+              </Text>
             </View>
           </View>
 
           {/* Body */}
-          <View style={styles.certificateBody}>
-            <Text style={styles.presentedTo}>This is to certify that</Text>
-            <Text style={styles.studentName}>{result.student.buyerName}</Text>
-            <Text style={styles.description}>
-              Has successfully completed the TOEFL ITP Simulation and achieved the predicted score as shown below.
+          <View style={styles.body}>
+            <Text style={[styles.presentedText, dynamicStyles.presentedText]}>
+              This certificate is proudly presented to
             </Text>
 
-            {/* Score Display */}
+            <Text style={[styles.studentName, dynamicStyles.studentName]}>
+              {result.student.buyerName}
+            </Text>
+
+            <Text style={[styles.description, dynamicStyles.description]}>
+              Has successfully completed the TOEFL ITP Simulation
+              and achieved the following score prediction.
+            </Text>
+
+            {/* Scores */}
             <View style={styles.scoreSection}>
-              <View style={styles.scoreBox}>
-                <Text style={styles.sectionValue}>{result.listeningCorrect}</Text>
-                <Text style={styles.sectionLabel}>Listening</Text>
+
+              <View style={[styles.scoreBox, dynamicStyles.scoreBox]}>
+                <Text style={styles.sectionValue}>
+                  {result.listeningCorrect}
+                </Text>
+                <Text style={styles.sectionLabel}>
+                  LISTENING
+                </Text>
               </View>
-              <View style={styles.scoreBox}>
-                <Text style={styles.sectionValue}>{result.structureCorrect}</Text>
-                <Text style={styles.sectionLabel}>Structure</Text>
+
+              <View style={[styles.scoreBox, dynamicStyles.scoreBox]}>
+                <Text style={styles.sectionValue}>
+                  {result.structureCorrect}
+                </Text>
+                <Text style={styles.sectionLabel}>
+                  STRUCTURE
+                </Text>
               </View>
-              <View style={styles.scoreBox}>
-                <Text style={styles.sectionValue}>{result.readingCorrect}</Text>
-                <Text style={styles.sectionLabel}>Reading</Text>
+
+              <View style={[styles.scoreBox, dynamicStyles.scoreBox]}>
+                <Text style={styles.sectionValue}>
+                  {result.readingCorrect}
+                </Text>
+                <Text style={styles.sectionLabel}>
+                  READING
+                </Text>
               </View>
-              <View style={styles.mainScore}>
-                <Text style={styles.mainScoreValue}>{result.totalScore}</Text>
-                <Text style={styles.mainScoreLabel}>TOTAL SCORE</Text>
+
+              <View style={[styles.totalBox, dynamicStyles.totalBox]}>
+                <Text style={[styles.totalValue, dynamicStyles.totalValue]}>
+                  {result.totalScore}
+                </Text>
+
+                <Text style={[styles.totalLabel, dynamicStyles.totalLabel]}>
+                  TOTAL SCORE
+                </Text>
               </View>
             </View>
           </View>
 
           {/* Footer */}
           <View style={styles.footer}>
-            <View style={styles.dateSection}>
-              <Text style={styles.dateLabel}>Date of Examination</Text>
-              <Text style={styles.dateValue}>{formattedDate}</Text>
+
+            <View style={styles.footerLeft}>
+              <Text style={[styles.footerLabel, dynamicStyles.footerLabel]}>
+                Date of Examination
+              </Text>
+
+              <Text style={[styles.footerValue, dynamicStyles.footerValue]}>
+                {formattedDate}
+              </Text>
+
+              {validityText && (
+                <Text style={[styles.validityText, { color: lightTextColor }]}>
+                  {validityText}
+                </Text>
+              )}
+
+              {customTemplate?.footerText && (
+                <Text style={[styles.footerTextCustom, { color: lightTextColor }]}>
+                  {customTemplate.footerText}
+                </Text>
+              )}
             </View>
-            <View style={styles.qrSection}>
-              <Text style={styles.qrLabel}>Scan to verify</Text>
-              <Image src={qrCodeDataUrl} style={styles.qrCode} />
-              <Text style={{ fontSize: 8, color: "#94a3b8" }}>{result.id.slice(0, 8)}...</Text>
-            </View>
-            <View style={styles.signature}>
-              <View style={styles.signatureLine} />
-              <Text style={styles.signatureLabel}>Authorized Signature</Text>
-            </View>
+
           </View>
         </View>
       </Page>

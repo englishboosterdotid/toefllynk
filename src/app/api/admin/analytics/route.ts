@@ -69,7 +69,7 @@ export async function GET() {
       }),
     ]);
 
-    // Monthly trend (last 6 months)
+    // Monthly trend (last 6 months) - optimized with single query
     const monthlyStats = [];
     for (let i = 5; i >= 0; i--) {
       const monthDate = new Date();
@@ -77,25 +77,27 @@ export async function GET() {
       const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
       const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
 
-      const monthResults = await prisma.examResult.findMany({
-        where: {
-          createdAt: {
-            gte: monthStart,
-            lte: monthEnd
-          }
-        }
-      });
-
-      const monthAvgScore = monthResults.length > 0
-        ? Math.round(monthResults.reduce((sum, r) => sum + r.totalScore, 0) / monthResults.length)
-        : 0;
-
       monthlyStats.push({
-        month: monthDate.toLocaleDateString("id-ID", { month: "short", year: "2-digit" }),
-        count: monthResults.length,
-        avgScore: monthAvgScore,
+        monthStart,
+        monthEnd,
+        monthLabel: monthDate.toLocaleDateString("id-ID", { month: "short", year: "2-digit" }),
       });
     }
+
+    // Get monthly data in parallel
+    const monthlyData = await Promise.all(
+      monthlyStats.map(({ monthStart, monthEnd, monthLabel }) =>
+        prisma.examResult.aggregate({
+          where: { createdAt: { gte: monthStart, lte: monthEnd } },
+          _count: true,
+          _avg: { totalScore: true },
+        }).then(result => ({
+          month: monthLabel,
+          count: result._count,
+          avgScore: result._avg.totalScore ? Math.round(result._avg.totalScore) : 0,
+        }))
+      )
+    );
 
     const avgScore = avgScoreResult._avg.totalScore 
       ? Math.round(avgScoreResult._avg.totalScore) 
@@ -142,7 +144,7 @@ export async function GET() {
           needsWork: needsWorkCount,
         },
       },
-      monthlyTrend: monthlyStats,
+      monthlyTrend: monthlyData,
       recentResults: recentResults.map(r => ({
         id: r.id,
         studentName: r.student.buyerName,

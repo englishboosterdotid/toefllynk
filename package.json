@@ -6,7 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:seed": "npx tsx prisma/seed.ts",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1041.0",
@@ -28,6 +34,8 @@
     "dotenv": "^17.4.2",
     "formidable": "^3.5.4",
     "framer-motion": "^12.38.0",
+    "ioredis": "^5.10.1",
+    "isomorphic-dompurify": "^3.12.0",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.14.0",
     "midtrans-client": "^1.4.3",
@@ -54,11 +62,13 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/ui": "^4.1.5",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "prisma": "^7.8.0",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.5"
   }
 }
