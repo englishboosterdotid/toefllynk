@@ -16,7 +16,7 @@ export async function GET() {
 
     // Get featured products count
     const featuredCount = await prisma.product.count({
-      where: { userId: session.userId, isFeatured: true },
+      where: { userId: session.userId, settings: { isFeatured: true } },
     });
 
     const tierInfo = await TierService.getUserTierInfo(session.userId);
@@ -119,16 +119,16 @@ export async function PUT(req: Request) {
       settingsData.showPoweredBy = body.showPoweredBy ?? true;
     }
 
-    // Social & contact (available to all)
-    settingsData.socialInstagram = body.socialInstagram;
-    settingsData.socialFacebook = body.socialFacebook;
-    settingsData.socialTwitter = body.socialTwitter;
-    settingsData.socialYoutube = body.socialYoutube;
-    settingsData.socialTiktok = body.socialTiktok;
-    settingsData.socialLinkedin = body.socialLinkedin;
-    settingsData.contactEmail = body.contactEmail;
-    settingsData.contactPhone = body.contactPhone;
-    settingsData.contactAddress = body.contactAddress;
+    // Social & contact (available to all) - only set if provided
+    if (body.socialInstagram !== undefined) settingsData.socialInstagram = body.socialInstagram || null;
+    if (body.socialFacebook !== undefined) settingsData.socialFacebook = body.socialFacebook || null;
+    if (body.socialTwitter !== undefined) settingsData.socialTwitter = body.socialTwitter || null;
+    if (body.socialYoutube !== undefined) settingsData.socialYoutube = body.socialYoutube || null;
+    if (body.socialTiktok !== undefined) settingsData.socialTiktok = body.socialTiktok || null;
+    if (body.socialLinkedin !== undefined) settingsData.socialLinkedin = body.socialLinkedin || null;
+    if (body.contactEmail !== undefined) settingsData.contactEmail = body.contactEmail || null;
+    if (body.contactPhone !== undefined) settingsData.contactPhone = body.contactPhone || null;
+    if (body.contactAddress !== undefined) settingsData.contactAddress = body.contactAddress || null;
 
     const settings = await prisma.micrositeSettings.upsert({
       where: { userId: session.userId },

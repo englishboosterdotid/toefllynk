@@ -24,7 +24,9 @@ export async function POST(req: Request) {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
-        product: true,
+        product: {
+          include: { settings: true },
+        },
         student: true,
       },
     });
@@ -55,15 +57,11 @@ export async function POST(req: Request) {
       );
     }
 
-    if (order.product.productType === "BUNDLE") {
-      return NextResponse.json(
-        { error: "Bundle orders don't have automatic access" },
-        { status: 400 }
-      );
-    }
-
+    // No specific product type check needed - simulation orders have automatic access
+    // The check was removed since we only have INDIVIDUAL package type
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const price = order.product.promoPrice || order.product.price;
+    const price = order.product.settings?.promoPrice || order.product.price;
+    const examCredits = order.product.settings?.examCredits || 1;
 
     // Resend the confirmation email
     await sendOrderConfirmation(order.buyerEmail, {
@@ -72,7 +70,7 @@ export async function POST(req: Request) {
       amount: price,
       buyerName: order.buyerName,
       accessToken: order.student.accessToken,
-      examCredits: order.product.examCredits,
+      examCredits,
       dashboardUrl: `${appUrl}/student/dashboard`,
       loginUrl: `${appUrl}/student/login`,
     });

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createSnapToken } from "@/lib/payment";
-import { createOrder } from "@/lib/services/orderService";
+import { OrderService } from "@/lib/services/orderService";
 import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
@@ -38,9 +38,10 @@ export async function POST(req: Request) {
     // Get product
     const product = await prisma.product.findUnique({
       where: { id: productId },
+      include: { settings: true },
     });
 
-    if (!product || product.isArchived) {
+    if (!product || product.settings?.isArchived) {
       return NextResponse.json(
         { error: "Product not found or unavailable" },
         { status: 404 }
@@ -48,7 +49,7 @@ export async function POST(req: Request) {
     }
 
     // Calculate price
-    const amount = product.promoPrice || product.price;
+    const amount = product.settings?.promoPrice || product.price;
 
     // Validate amount
     if (amount < 1000) {
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
     }
 
     // Create order in pending status
-    const orderResult = await createOrder({
+    const orderResult = await OrderService.createOrder({
       productId,
       buyerName,
       buyerEmail,

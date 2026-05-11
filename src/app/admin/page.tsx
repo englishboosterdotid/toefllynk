@@ -39,7 +39,11 @@ export default async function AdminPage() {
 
   // Recent orders
   const recentOrders = await prisma.order.findMany({
-    include: { product: { select: { title: true, thumbnail: true, price: true, promoPrice: true } } },
+    include: {
+      product: {
+        include: { settings: true },
+      },
+    },
     orderBy: { createdAt: "desc" },
     take: 5,
   });
@@ -283,7 +287,7 @@ export default async function AdminPage() {
                     </div>
                     <div className="text-right">
                       <p className="font-semibold text-slate-900">
-                        Rp {(order.product?.promoPrice || order.product?.price || 0).toLocaleString("id-ID")}
+                        Rp {(order.product?.settings?.promoPrice || order.product?.price || 0).toLocaleString("id-ID")}
                       </p>
                       <p className="text-xs text-slate-400 mt-1">
                         {new Date(order.createdAt).toLocaleDateString("id-ID", {

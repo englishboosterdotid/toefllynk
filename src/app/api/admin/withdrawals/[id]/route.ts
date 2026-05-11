@@ -29,9 +29,16 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
       include: {
         user: {
           select: {
-            bankName: true,
-            bankAccount: true,
-            bankHolder: true,
+            id: true,
+          },
+          include: {
+            bankAccount: {
+              select: {
+                bankName: true,
+                bankAccount: true,
+                bankHolder: true,
+              },
+            },
           },
         },
       },
@@ -120,7 +127,9 @@ export async function GET(req: Request, { params }: { params: Params }) {
             name: true,
             email: true,
             username: true,
-            whatsapp: true,
+          },
+          include: {
+            profile: { select: { whatsapp: true } },
           },
         },
       },

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createOrder } from "@/lib/services/orderService";
-import { productRepository } from "@/lib/repositories";
+import { OrderService } from "@/lib/services/orderService";
+import { ProductService } from "@/lib/services/ProductService";
 import prisma from "@/lib/prisma";
 
 export async function POST(req: Request) {
@@ -13,14 +13,14 @@ export async function POST(req: Request) {
   const referralCode = formData.get("referralCode") as string;
   const promoCode = formData.get("promoCode") as string;
 
-  const product = await productRepository.findByIdWithOwner(productId);
+  const product = await ProductService.getProductWithOwner(productId);
 
-  if (!product || product.isArchived) {
+  if (!product || product.settings?.isArchived) {
     return NextResponse.redirect(new URL("/program-closed", req.url));
   }
 
   // Validate promo code if provided
-  let finalPrice = product.promoPrice || product.price;
+  let finalPrice = product.settings?.promoPrice || product.price;
   let appliedPromoId: string | null = null;
   let discountAmount = 0;
 
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
     }
   }
 
-  await createOrder({
+  await OrderService.createOrder({
     productId,
     buyerName,
     buyerEmail,
@@ -63,7 +63,6 @@ export async function POST(req: Request) {
     referralCode: referralCode || null,
     promoCodeId: appliedPromoId,
     discountAmount,
-    finalPrice,
   });
 
   return NextResponse.redirect(new URL("/thank-you", req.url));

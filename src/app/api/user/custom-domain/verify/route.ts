@@ -13,8 +13,8 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.userId },
+    const profile = await prisma.sellerProfile.findUnique({
+      where: { userId: session.userId },
       select: {
         customDomain: true,
         domainVerified: true,
@@ -22,15 +22,15 @@ export async function POST() {
       },
     });
 
-    if (!user?.customDomain) {
+    if (!profile?.customDomain) {
       return NextResponse.json({ error: "No custom domain configured" }, { status: 400 });
     }
 
-    if (user.sellerTier !== "BUSINESS") {
+    if (profile.sellerTier !== "BUSINESS") {
       return NextResponse.json({ error: "Custom domain requires BUSINESS tier" }, { status: 403 });
     }
 
-    if (user.domainVerified) {
+    if (profile.domainVerified) {
       return NextResponse.json({
         success: true,
         verified: true,
@@ -39,7 +39,7 @@ export async function POST() {
     }
 
     // Verify TXT record
-    const domainToCheck = `_toefllynk-verification.${user.customDomain}`;
+    const domainToCheck = `_toefllynk-verification.${profile.customDomain}`;
 
     try {
       const records = await resolveTxt(domainToCheck);
@@ -50,8 +50,8 @@ export async function POST() {
       );
 
       if (isVerified) {
-        await prisma.user.update({
-          where: { id: session.userId },
+        await prisma.sellerProfile.update({
+          where: { userId: session.userId },
           data: {
             domainVerified: true,
             domainVerifiedAt: new Date(),

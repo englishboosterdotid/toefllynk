@@ -8,14 +8,21 @@ export default async function AffiliateMarketplacePage() {
   // Get products that have affiliate enabled
   const products = await prisma.product.findMany({
     where: {
-      isArchived: false,
-      affiliateEnabled: true,
+      settings: {
+        isArchived: false,
+        affiliateEnabled: true,
+      },
       userId: {
         not: user?.id,
       },
     },
     include: {
-      user: true,
+      user: {
+        select: { id: true, name: true, username: true, avatar: true },
+      },
+      settings: {
+        select: { promoPrice: true, affiliateCommission: true },
+      },
       affiliateEnrollments: {
         where: {
           affiliateUserId: user?.id,
@@ -52,7 +59,7 @@ export default async function AffiliateMarketplacePage() {
               )}
 
               <p className="text-sm text-blue-500 font-medium mb-2">
-                @{product.user.username}
+                @{product.user?.username}
               </p>
               <h3 className="text-xl font-bold text-slate-900">{product.title}</h3>
               <p className="text-sm text-gray-500 mt-2 line-clamp-2">
@@ -60,16 +67,17 @@ export default async function AffiliateMarketplacePage() {
               </p>
               <div className="mt-4">
                 <p className="font-semibold text-lg text-slate-900">
-                  Rp {(product.promoPrice || product.price).toLocaleString("id-ID")}
+                  Rp {(product.settings?.promoPrice || product.price).toLocaleString("id-ID")}
                 </p>
                 <p className="text-green-600 font-medium">
-                  Commission: {product.affiliateCommission}%
+                  Commission: {product.settings?.affiliateCommission ?? 10}%
                 </p>
               </div>
 
               <form action="/api/affiliate/join" method="POST">
                 <input type="hidden" name="productId" value={product.id} />
                 <input type="hidden" name="ownerUserId" value={product.userId} />
+                <input type="hidden" name="commissionPercent" value={product.settings?.affiliateCommission || 10} />
                 <button className="mt-4 w-full bg-blue-600 text-white px-5 py-2.5 rounded-xl font-medium hover:bg-blue-700 transition-colors">
                   Ambil Link Affiliate
                 </button>

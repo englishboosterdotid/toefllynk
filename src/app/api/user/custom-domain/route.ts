@@ -15,8 +15,8 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.userId },
+    const profile = await prisma.sellerProfile.findUnique({
+      where: { userId: session.userId },
       select: {
         customDomain: true,
         domainVerified: true,
@@ -26,10 +26,10 @@ export async function GET() {
     });
 
     return NextResponse.json({
-      customDomain: user?.customDomain,
-      domainVerified: user?.domainVerified,
-      domainVerifiedAt: user?.domainVerifiedAt,
-      canSetCustomDomain: user?.sellerTier === "BUSINESS",
+      customDomain: profile?.customDomain,
+      domainVerified: profile?.domainVerified,
+      domainVerifiedAt: profile?.domainVerifiedAt,
+      canSetCustomDomain: profile?.sellerTier === "BUSINESS",
     });
   } catch (error) {
     console.error("Get custom domain error:", error);
@@ -75,9 +75,14 @@ export async function PUT(req: Request) {
     // Generate verification token
     const verificationToken = generateVerificationToken();
 
-    await prisma.user.update({
-      where: { id: session.userId },
-      data: {
+    await prisma.sellerProfile.upsert({
+      where: { userId: session.userId },
+      create: {
+        userId: session.userId,
+        customDomain: customDomain.toLowerCase(),
+        domainVerified: false,
+      },
+      update: {
         customDomain: customDomain.toLowerCase(),
         domainVerified: false,
         domainVerifiedAt: null,
@@ -112,8 +117,8 @@ export async function DELETE() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await prisma.user.update({
-      where: { id: session.userId },
+    await prisma.sellerProfile.update({
+      where: { userId: session.userId },
       data: {
         customDomain: null,
         domainVerified: false,

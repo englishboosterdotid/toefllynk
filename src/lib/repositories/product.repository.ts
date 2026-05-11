@@ -8,19 +8,9 @@ const SELECT_PRODUCT_WITH_USER = {
   title: true,
   description: true,
   price: true,
-  promoPrice: true,
   thumbnail: true,
-  checkoutLink: true,
   category: true,
   productType: true,
-  packageType: true,
-  examCredits: true,
-  certificateIncluded: true,
-  reviewIncluded: true,
-  zoomIncluded: true,
-  affiliateEnabled: true,
-  isArchived: true,
-  isVisibleOnMicrosite: true,
   createdAt: true,
   user: {
     select: {
@@ -28,9 +18,14 @@ const SELECT_PRODUCT_WITH_USER = {
       name: true,
       username: true,
       avatar: true,
-      headline: true,
+      profile: {
+        select: {
+          headline: true,
+        },
+      },
     },
   },
+  settings: true,
   _count: {
     select: {
       orders: true,
@@ -45,17 +40,11 @@ const SELECT_PRODUCT_BASIC = {
   title: true,
   description: true,
   price: true,
-  promoPrice: true,
   thumbnail: true,
   category: true,
   productType: true,
-  packageType: true,
-  examCredits: true,
-  certificateIncluded: true,
-  reviewIncluded: true,
-  zoomIncluded: true,
-  isArchived: true,
   createdAt: true,
+  settings: true,
 } as const;
 
 export type ProductWithUser = Prisma.ProductGetPayload<{ select: typeof SELECT_PRODUCT_WITH_USER }>;
@@ -74,8 +63,14 @@ export class ProductRepository extends BaseRepository {
       where: { id },
       include: {
         user: {
-          select: { id: true, sellerTier: true },
+          select: {
+            id: true,
+            profile: {
+              select: { sellerTier: true, customFeeRate: true },
+            },
+          },
         },
+        settings: true,
       },
     });
   }
@@ -84,18 +79,60 @@ export class ProductRepository extends BaseRepository {
     return prisma.product.findMany({
       where: {
         userId,
-        ...(includeArchived ? {} : { isArchived: false }),
+        ...(includeArchived ? {} : { settings: { isArchived: false } }),
       },
       orderBy: { createdAt: "desc" },
-      select: SELECT_PRODUCT_WITH_USER,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+            profile: {
+              select: {
+                headline: true,
+              },
+            },
+          },
+        },
+        settings: true,
+        _count: {
+          select: {
+            orders: true,
+            affiliateEnrollments: true,
+          },
+        },
+      },
     });
   }
 
   async findArchivedByUserId(userId: string): Promise<ProductWithUser[]> {
     return prisma.product.findMany({
-      where: { userId, isArchived: true },
+      where: { userId, settings: { isArchived: true } },
       orderBy: { createdAt: "desc" },
-      select: SELECT_PRODUCT_WITH_USER,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+            profile: {
+              select: {
+                headline: true,
+              },
+            },
+          },
+        },
+        settings: true,
+        _count: {
+          select: {
+            orders: true,
+            affiliateEnrollments: true,
+          },
+        },
+      },
     });
   }
 
@@ -103,11 +140,34 @@ export class ProductRepository extends BaseRepository {
     return prisma.product.findMany({
       where: {
         userId,
-        isArchived: false,
-        isVisibleOnMicrosite: true,
+        settings: {
+          isArchived: false,
+          isVisibleOnMicrosite: true,
+        },
       },
       orderBy: { createdAt: "desc" },
-      select: SELECT_PRODUCT_WITH_USER,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+            profile: {
+              select: {
+                headline: true,
+              },
+            },
+          },
+        },
+        settings: true,
+        _count: {
+          select: {
+            orders: true,
+            affiliateEnrollments: true,
+          },
+        },
+      },
     });
   }
 
@@ -115,12 +175,35 @@ export class ProductRepository extends BaseRepository {
     return prisma.product.findMany({
       where: {
         userId,
-        isArchived: false,
-        isFeatured: true,
+        settings: {
+          isArchived: false,
+          isFeatured: true,
+        },
       },
       take: limit,
       orderBy: { createdAt: "desc" },
-      select: SELECT_PRODUCT_WITH_USER,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+            profile: {
+              select: {
+                headline: true,
+              },
+            },
+          },
+        },
+        settings: true,
+        _count: {
+          select: {
+            orders: true,
+            affiliateEnrollments: true,
+          },
+        },
+      },
     });
   }
 
@@ -128,19 +211,20 @@ export class ProductRepository extends BaseRepository {
     userId: string;
     title: string;
     description?: string | null;
-    packageType?: PackageType;
     productType?: ProductType;
-    examCredits?: number;
     price: number;
-    promoPrice?: number | null;
     thumbnail?: string | null;
     category?: string | null;
+    // Settings
+    packageType?: PackageType;
+    examCredits?: number;
     certificateIncluded?: boolean;
     reviewIncluded?: boolean;
     zoomIncluded?: boolean;
     affiliateEnabled?: boolean;
     checkoutLink?: string | null;
     affiliateCommission?: number;
+    promoPrice?: number | null;
   }): Promise<ProductWithUser> {
     return prisma.product.create({
       data: {
@@ -148,18 +232,22 @@ export class ProductRepository extends BaseRepository {
         title: data.title,
         description: data.description,
         price: data.price,
-        promoPrice: data.promoPrice,
         thumbnail: data.thumbnail,
-        checkoutLink: data.checkoutLink,
         category: data.category,
         productType: data.productType,
-        packageType: data.packageType,
-        examCredits: data.examCredits,
-        certificateIncluded: data.certificateIncluded,
-        reviewIncluded: data.reviewIncluded,
-        zoomIncluded: data.zoomIncluded,
-        affiliateEnabled: data.affiliateEnabled,
-        affiliateCommission: data.affiliateCommission,
+        settings: {
+          create: {
+            packageType: data.packageType,
+            examCredits: data.examCredits || 1,
+            certificateIncluded: data.certificateIncluded ?? true,
+            reviewIncluded: data.reviewIncluded ?? false,
+            zoomIncluded: data.zoomIncluded ?? false,
+            affiliateEnabled: data.affiliateEnabled ?? false,
+            affiliateCommission: data.affiliateCommission || 10,
+            checkoutLink: data.checkoutLink,
+            promoPrice: data.promoPrice,
+          },
+        },
       },
       select: SELECT_PRODUCT_WITH_USER,
     });
@@ -170,19 +258,10 @@ export class ProductRepository extends BaseRepository {
     data: {
       title?: string;
       description?: string | null;
-      packageType?: string;
       productType?: string;
-      examCredits?: number;
       price?: number;
-      promoPrice?: number | null;
       thumbnail?: string | null;
-      checkoutLink?: string | null;
       category?: string | null;
-      certificateIncluded?: boolean;
-      reviewIncluded?: boolean;
-      zoomIncluded?: boolean;
-      isFeatured?: boolean;
-      isVisibleOnMicrosite?: boolean;
     }
   ): Promise<ProductWithUser | null> {
     return prisma.product.update({
@@ -192,20 +271,43 @@ export class ProductRepository extends BaseRepository {
     });
   }
 
-  async archive(id: string): Promise<ProductWithUser | null> {
-    return prisma.product.update({
-      where: { id },
-      data: { isArchived: true },
-      select: SELECT_PRODUCT_WITH_USER,
+  async updateSettings(
+    productId: string,
+    data: {
+      packageType?: PackageType;
+      examCredits?: number;
+      certificateIncluded?: boolean;
+      reviewIncluded?: boolean;
+      zoomIncluded?: boolean;
+      affiliateEnabled?: boolean;
+      affiliateCommission?: number;
+      checkoutLink?: string | null;
+      promoPrice?: number | null;
+      isFeatured?: boolean;
+      isVisibleOnMicrosite?: boolean;
+      isArchived?: boolean;
+    }
+  ) {
+    return prisma.productSettings.upsert({
+      where: { productId },
+      create: { productId, ...data },
+      update: data,
     });
   }
 
+  async archive(id: string): Promise<ProductWithUser | null> {
+    return prisma.productSettings.upsert({
+      where: { productId: id },
+      create: { productId: id, isArchived: true },
+      update: { isArchived: true },
+    }).then(() => prisma.product.findUnique({ where: { id }, select: SELECT_PRODUCT_WITH_USER }));
+  }
+
   async unarchive(id: string): Promise<ProductWithUser | null> {
-    return prisma.product.update({
-      where: { id },
+    return prisma.productSettings.update({
+      where: { productId: id },
       data: { isArchived: false },
-      select: SELECT_PRODUCT_WITH_USER,
-    });
+    }).then(() => prisma.product.findUnique({ where: { id }, select: SELECT_PRODUCT_WITH_USER }));
   }
 
   async delete(id: string): Promise<void> {
@@ -213,33 +315,42 @@ export class ProductRepository extends BaseRepository {
   }
 
   async countByUser(userId: string): Promise<number> {
-    return prisma.product.count({ where: { userId, isArchived: false } });
+    return prisma.product.count({
+      where: {
+        userId,
+        settings: { isArchived: false },
+      },
+    });
   }
 
   async countVisibleOnMicrosite(userId: string): Promise<number> {
     return prisma.product.count({
       where: {
         userId,
-        isArchived: false,
-        isVisibleOnMicrosite: true,
+        settings: {
+          isArchived: false,
+          isVisibleOnMicrosite: true,
+        },
       },
     });
   }
 
   async toggleAffiliate(id: string, enabled: boolean): Promise<ProductWithUser | null> {
-    return prisma.product.update({
-      where: { id },
-      data: { affiliateEnabled: enabled },
-      select: SELECT_PRODUCT_WITH_USER,
+    await prisma.productSettings.upsert({
+      where: { productId: id },
+      create: { productId: id, affiliateEnabled: enabled },
+      update: { affiliateEnabled: enabled },
     });
+    return prisma.product.findUnique({ where: { id }, select: SELECT_PRODUCT_WITH_USER });
   }
 
   async toggleVisibility(id: string, visible: boolean): Promise<ProductWithUser | null> {
-    return prisma.product.update({
-      where: { id },
-      data: { isVisibleOnMicrosite: visible },
-      select: SELECT_PRODUCT_WITH_USER,
+    await prisma.productSettings.upsert({
+      where: { productId: id },
+      create: { productId: id, isVisibleOnMicrosite: visible },
+      update: { isVisibleOnMicrosite: visible },
     });
+    return prisma.product.findUnique({ where: { id }, select: SELECT_PRODUCT_WITH_USER });
   }
 
   async findWithAffiliateInfo(productId: string, referralCode: string) {
@@ -257,15 +368,20 @@ export class ProductRepository extends BaseRepository {
             name: true,
             username: true,
             avatar: true,
-            headline: true,
-            ctaText: true,
-            whatsapp: true,
+            profile: {
+              select: {
+                headline: true,
+                ctaText: true,
+                whatsapp: true,
+              },
+            },
           },
         },
         affiliateEnrollments: {
           where: { referralCode },
           select: { commissionPercent: true },
         },
+        settings: true,
       },
     });
   }
@@ -285,7 +401,7 @@ export class ProductRepository extends BaseRepository {
         orderBy,
         skip,
         take: limit,
-        select: SELECT_PRODUCT_BASIC,
+        include: { settings: true },
       }),
       prisma.product.count({ where }),
     ]);

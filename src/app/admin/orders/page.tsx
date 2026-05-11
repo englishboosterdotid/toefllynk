@@ -8,7 +8,10 @@ export const dynamic = "force-dynamic";
 export default async function OrdersPage() {
   const orders = await prisma.order.findMany({
     include: {
-      product: { select: { title: true, thumbnail: true, price: true, promoPrice: true } },
+      product: {
+        include: { settings: true },
+        select: { title: true, thumbnail: true, price: true },
+      },
       student: { select: { buyerName: true, buyerEmail: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -49,7 +52,7 @@ export default async function OrdersPage() {
             { label: "Total Orders", value: orders.length, color: "blue" },
             { label: "Pending", value: orders.filter(o => o.status === "PENDING").length, color: "yellow" },
             { label: "Completed", value: orders.filter(o => o.status === "COMPLETED").length, color: "green" },
-            { label: "Revenue", value: `Rp ${orders.filter(o => o.status === "COMPLETED").reduce((acc, o) => acc + (o.product?.promoPrice || o.product?.price || 0), 0).toLocaleString("id-ID")}`, color: "purple" },
+            { label: "Revenue", value: `Rp ${orders.filter(o => o.status === "COMPLETED").reduce((acc, o) => acc + (o.product?.settings?.promoPrice || o.product?.price || 0), 0).toLocaleString("id-ID")}`, color: "purple" },
           ].map((stat) => (
             <div key={stat.label} className="bg-white rounded-xl border border-slate-200 p-4">
               <p className="text-sm text-slate-500">{stat.label}</p>
@@ -134,7 +137,7 @@ export default async function OrdersPage() {
                       </td>
                       <td className="px-6 py-4">
                         <span className="font-semibold text-slate-900">
-                          {formatPrice(order.product?.promoPrice || order.product?.price || 0)}
+                          {formatPrice(order.product?.settings?.promoPrice || order.product?.price || 0)}
                         </span>
                       </td>
                       <td className="px-6 py-4">

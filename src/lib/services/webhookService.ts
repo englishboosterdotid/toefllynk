@@ -33,14 +33,14 @@ export async function createWebhook(
     // Check tier - BUSINESS only
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { sellerTier: true },
+      select: { profile: { select: { sellerTier: true } } },
     });
 
     if (!user) {
       return { success: false, error: "User tidak ditemukan" };
     }
 
-    const tierConfig = TierServiceClass.getConfig(user.sellerTier as SellerTier);
+    const tierConfig = TierServiceClass.getConfig(user.profile?.sellerTier as SellerTier);
 
     if (!tierConfig.hasWebhook) {
       return { success: false, error: "Fitur Webhook hanya untuk BUSINESS tier" };
@@ -238,7 +238,14 @@ export async function onOrderCompleted(orderId: string): Promise<void> {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: {
-      product: { select: { userId: true, title: true, promoPrice: true, price: true } },
+      product: {
+        select: {
+          userId: true,
+          title: true,
+          price: true,
+          settings: { select: { promoPrice: true } },
+        },
+      },
     },
   });
 
@@ -250,7 +257,7 @@ export async function onOrderCompleted(orderId: string): Promise<void> {
     buyerEmail: order.buyerEmail,
     buyerName: order.buyerName,
     status: order.status,
-    totalAmount: order.product.promoPrice || order.product.price,
+    totalAmount: order.product.settings?.promoPrice || order.product.price,
     createdAt: order.createdAt.toISOString(),
   });
 }

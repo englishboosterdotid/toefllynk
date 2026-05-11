@@ -23,7 +23,10 @@ export async function GET(
       where: { id: resultId },
       include: {
         student: true,
-        product: { select: { userId: true, reviewIncluded: true } },
+        product: {
+          select: { userId: true },
+          include: { settings: { select: { reviewIncluded: true } } },
+        },
       },
     });
 
@@ -41,7 +44,7 @@ export async function GET(
     }
 
     // Check if review is included in the product
-    if (!result.product.reviewIncluded && !isAdmin) {
+    if (!result.product.settings?.reviewIncluded && !isAdmin) {
       return NextResponse.json({ error: "Review not available for this product" }, { status: 403 });
     }
 
@@ -90,7 +93,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       resultId,
-      reviewIncluded: result.product.reviewIncluded,
+      reviewIncluded: result.product.settings?.reviewIncluded,
       totalQuestions: questions.length,
       answeredCount: session?.answers.length || 0,
       questions: reviewData,

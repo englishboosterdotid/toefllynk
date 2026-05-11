@@ -15,6 +15,7 @@ export async function POST(req: Request) {
     const formData = await req.formData();
     const productId = formData.get("productId") as string;
     const ownerUserId = formData.get("ownerUserId") as string;
+    const commissionPercent = parseInt(formData.get("commissionPercent") as string) || 10;
 
     const user = await requireUser();
 
@@ -32,6 +33,7 @@ export async function POST(req: Request) {
           ownerUserId,
           productId,
           referralCode: generateCode(),
+          commissionPercent,
         },
       });
     }

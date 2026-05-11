@@ -74,8 +74,8 @@ export default async function DashboardPage() {
     },
   });
 
-  const micrositeReady = await prisma.user.findUnique({
-    where: { id: user?.id },
+  const micrositeReady = await prisma.sellerProfile.findUnique({
+    where: { userId: user?.id },
     select: {
       sellerTier: true,
       subscriptionEnd: true,
@@ -91,6 +91,21 @@ export default async function DashboardPage() {
     where: {
       affiliateUserId: user?.id,
     },
+  });
+
+  // Get affiliate detailed stats
+  const affiliateLinks = await prisma.affiliateEnrollment.findMany({
+    where: { affiliateUserId: user?.id },
+    select: { referralCode: true },
+  });
+  const affiliateCodes = affiliateLinks.map((l) => l.referralCode);
+
+  const affiliateClicks = await prisma.affiliateClick.count({
+    where: { referralCode: { in: affiliateCodes } },
+  });
+
+  const affiliateSales = await prisma.affiliateConversion.count({
+    where: { affiliateUserId: user?.id },
   });
 
   const checklistItems = [
@@ -278,18 +293,28 @@ export default async function DashboardPage() {
             <h2 className="text-lg font-semibold text-slate-900">Affiliate Promotion</h2>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-4">
             <StatCard
               iconName="DollarSign"
-              label="Total Affiliate Earnings"
+              label="Total Earnings"
               value={formatCurrency(myAffiliate._sum.commissionAmount || 0)}
             />
             <StatCard
               iconName="Target"
-              label="Affiliate Links Active"
+              label="Links Active"
               value={affiliateJoined}
               trend={affiliateJoined > 0 ? "Active" : "Not joined"}
               trendUp={affiliateJoined > 0}
+            />
+            <StatCard
+              iconName="TrendingUp"
+              label="Total Clicks"
+              value={affiliateClicks}
+            />
+            <StatCard
+              iconName="ShoppingCart"
+              label="Total Sales"
+              value={affiliateSales}
             />
           </div>
         </div>

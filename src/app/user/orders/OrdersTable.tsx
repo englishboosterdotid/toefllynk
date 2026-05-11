@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { OrderStatus, PackageType } from "@/generated/prisma/enums";
+import { OrderStatus } from "@/generated/prisma/enums";
 import {
   CheckCircle2,
   Clock,
@@ -86,8 +86,10 @@ interface Order {
     id: string;
     title: string;
     price: number;
-    promoPrice: number | null;
-    packageType: PackageType | null;
+    settings?: {
+      promoPrice: number | null;
+    } | null;
+    packageType?: string | null;
     productType: string;
   };
   affiliateConversion: {
@@ -248,7 +250,7 @@ export function OrdersTable({ orders }: OrdersTableProps) {
       ) : (
         <div className="divide-y divide-slate-100">
           {filteredOrders.map((order) => {
-            const isBundle = order.product.packageType === PackageType.BUNDLE;
+            const isBundle = false; // PackageType only has INDIVIDUAL now
             const isExpanded = expandedOrders.has(order.id);
             const student = order.student;
             const remainingCredits = student
@@ -265,7 +267,7 @@ export function OrdersTable({ orders }: OrdersTableProps) {
               student && student.results.length > 0
                 ? student.results[0].totalScore
                 : null;
-            const amount = order.product.promoPrice || order.product.price;
+            const amount = order.product.settings?.promoPrice || order.product.price;
 
             return (
               <div key={order.id}>

@@ -20,10 +20,16 @@ export async function PUT(req: Request) {
       );
     }
 
-    // Update user's bank info
-    const user = await prisma.user.update({
-      where: { id: session.userId },
-      data: {
+    // Update user's bank info via BankAccount
+    await prisma.bankAccount.upsert({
+      where: { userId: session.userId },
+      create: {
+        userId: session.userId,
+        bankName: bankName.trim(),
+        bankAccount: bankAccount.trim(),
+        bankHolder: bankHolder.trim(),
+      },
+      update: {
         bankName: bankName.trim(),
         bankAccount: bankAccount.trim(),
         bankHolder: bankHolder.trim(),
@@ -34,9 +40,9 @@ export async function PUT(req: Request) {
       success: true,
       message: "Bank information updated successfully",
       data: {
-        bankName: user.bankName,
-        bankAccount: user.bankAccount,
-        bankHolder: user.bankHolder,
+        bankName,
+        bankAccount,
+        bankHolder,
       },
     });
   } catch (error) {
@@ -53,18 +59,13 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.userId },
-      select: {
-        bankName: true,
-        bankAccount: true,
-        bankHolder: true,
-      },
+    const bankInfo = await prisma.bankAccount.findUnique({
+      where: { userId: session.userId },
     });
 
     return NextResponse.json({
       success: true,
-      data: user,
+      data: bankInfo,
     });
   } catch (error) {
     console.error("Get bank info error:", error);

@@ -15,6 +15,7 @@ export async function GET(
       where: { id },
       include: {
         user: { select: { id: true, name: true, email: true } },
+        settings: true,
       },
     });
 
@@ -46,17 +47,38 @@ export async function PUT(
       select: { thumbnail: true },
     });
 
+    // Update basic product info
     const product = await prisma.product.update({
       where: { id },
       data: {
         title: body.title,
         description: body.description,
         price: parseInt(body.price),
-        promoPrice: body.promoPrice ? parseInt(body.promoPrice) : null,
         thumbnail: body.thumbnail,
-        checkoutLink: body.checkoutLink,
         category: body.category,
         productType: body.productType,
+      },
+    });
+
+    // Update settings via ProductSettings
+    await prisma.productSettings.upsert({
+      where: { productId: id },
+      create: {
+        productId: id,
+        promoPrice: body.promoPrice ? parseInt(body.promoPrice) : null,
+        checkoutLink: body.checkoutLink,
+        packageType: body.packageType,
+        examCredits: parseInt(body.examCredits) || 1,
+        certificateIncluded: body.certificateIncluded,
+        reviewIncluded: body.reviewIncluded,
+        zoomIncluded: body.zoomIncluded,
+        affiliateEnabled: body.affiliateEnabled,
+        affiliateCommission: parseInt(body.affiliateCommission) || 10,
+        isArchived: body.isArchived,
+      },
+      update: {
+        promoPrice: body.promoPrice ? parseInt(body.promoPrice) : null,
+        checkoutLink: body.checkoutLink,
         packageType: body.packageType,
         examCredits: parseInt(body.examCredits) || 1,
         certificateIncluded: body.certificateIncluded,

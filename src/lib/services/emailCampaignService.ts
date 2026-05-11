@@ -18,14 +18,14 @@ export interface EmailQuotaInfo {
 export async function getEmailQuota(userId: string): Promise<EmailQuotaInfo> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { sellerTier: true },
+    select: { profile: { select: { sellerTier: true } } },
   });
 
   if (!user) {
     throw new Error("User not found");
   }
 
-  const tierConfig = TierServiceClass.getConfig(user.sellerTier as SellerTier);
+  const tierConfig = TierServiceClass.getConfig(user.profile?.sellerTier as SellerTier);
   const limit = tierConfig.emailMarketingLimit;
 
   // Get total sent this month
@@ -83,14 +83,14 @@ export async function createCampaign(
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { sellerTier: true },
+      select: { profile: { select: { sellerTier: true } } },
     });
 
     if (!user) {
       return { success: false, error: "User tidak ditemukan" };
     }
 
-    const tierConfig = TierServiceClass.getConfig(user.sellerTier as SellerTier);
+    const tierConfig = TierServiceClass.getConfig(user.profile?.sellerTier as SellerTier);
 
     if (tierConfig.emailMarketingLimit === 0) {
       return { success: false, error: "Email marketing tidak tersedia untuk tier ini" };

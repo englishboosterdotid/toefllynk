@@ -9,7 +9,7 @@ export default async function AnalyticsPage() {
 
   const products = await prisma.product.findMany({
     where: { userId: user?.id },
-    select: { id: true, title: true, price: true, promoPrice: true },
+    include: { settings: true },
   });
 
   const productIds = products.map((p) => p.id);
@@ -17,7 +17,9 @@ export default async function AnalyticsPage() {
   const orders = await prisma.order.findMany({
     where: { productId: { in: productIds } },
     include: {
-      product: { select: { title: true, price: true, promoPrice: true, thumbnail: true } },
+      product: {
+        include: { settings: true },
+      },
       affiliateConversion: { select: { commissionAmount: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -28,7 +30,7 @@ export default async function AnalyticsPage() {
   const pendingOrders = orders.filter((o) => o.status === OrderStatus.PENDING);
 
   const totalRevenue = successOrders.reduce((sum, order) => {
-    return sum + (order.product?.promoPrice || order.product?.price || 0);
+    return sum + (order.product?.settings?.promoPrice || order.product?.price || 0);
   }, 0);
 
   const totalAffiliateCommission = successOrders.reduce((sum, order) => {
@@ -55,7 +57,7 @@ export default async function AnalyticsPage() {
     return {
       date,
       count: dayOrders.length,
-      revenue: dayOrders.filter(o => o.status === OrderStatus.COMPLETED).reduce((sum, o) => sum + (o.product?.promoPrice || o.product?.price || 0), 0),
+      revenue: dayOrders.filter(o => o.status === OrderStatus.COMPLETED).reduce((sum, o) => sum + (o.product?.settings?.promoPrice || o.product?.price || 0), 0),
     };
   });
 
@@ -197,7 +199,7 @@ export default async function AnalyticsPage() {
                 </div>
                 <div className="text-right">
                   <p className="font-semibold text-slate-900">
-                    Rp {(order.product?.promoPrice || order.product?.price || 0).toLocaleString("id-ID")}
+                    Rp {(order.product?.settings?.promoPrice || order.product?.price || 0).toLocaleString("id-ID")}
                   </p>
                   <p className="text-xs text-slate-400 flex items-center gap-1 justify-end">
                     <Calendar className="h-3 w-3" />

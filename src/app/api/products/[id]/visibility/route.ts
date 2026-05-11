@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/requireUser";
-import { setMicrositeVisibility } from "@/lib/services/productService";
+import { ProductService } from "@/lib/services/ProductService";
 
 type Params = Promise<{ id: string }>;
 
@@ -14,7 +14,7 @@ export async function PATCH(
     const body = await req.json();
     const { visible } = body;
 
-    const result = await setMicrositeVisibility(id, user.id, visible === true);
+    const result = await ProductService.toggleMicrositeVisibility(id, user.id, visible === true);
 
     return NextResponse.json(result);
   } catch (error: any) {

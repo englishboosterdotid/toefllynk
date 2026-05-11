@@ -30,14 +30,14 @@ export async function checkApiAccess(
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { sellerTier: true },
+      select: { id: true, profile: { select: { sellerTier: true } } },
     });
 
     if (!user) {
       return { hasAccess: false, error: "User tidak ditemukan" };
     }
 
-    const tierConfig = TierServiceClass.getConfig(user.sellerTier as SellerTier);
+    const tierConfig = TierServiceClass.getConfig(user.profile?.sellerTier as SellerTier);
 
     if (!tierConfig.hasAPIAccess) {
       return { hasAccess: false, error: "Fitur API hanya untuk PRO+" };
@@ -75,14 +75,14 @@ export async function createApiKey(
     // Check tier
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { sellerTier: true },
+      select: { id: true, profile: { select: { sellerTier: true } } },
     });
 
     if (!user) {
       return { success: false, error: "User tidak ditemukan" };
     }
 
-    const tierConfig = TierServiceClass.getConfig(user.sellerTier as SellerTier);
+    const tierConfig = TierServiceClass.getConfig(user.profile?.sellerTier as SellerTier);
 
     if (!tierConfig.hasAPIAccess) {
       return { success: false, error: "Fitur API hanya untuk PRO+" };
@@ -122,14 +122,14 @@ export async function regenerateApiKey(
     // Check tier
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { sellerTier: true },
+      select: { id: true, profile: { select: { sellerTier: true } } },
     });
 
     if (!user) {
       return { success: false, error: "User tidak ditemukan" };
     }
 
-    const tierConfig = TierServiceClass.getConfig(user.sellerTier as SellerTier);
+    const tierConfig = TierServiceClass.getConfig(user.profile?.sellerTier as SellerTier);
 
     if (!tierConfig.hasAPIAccess) {
       return { success: false, error: "Fitur API hanya untuk PRO+" };

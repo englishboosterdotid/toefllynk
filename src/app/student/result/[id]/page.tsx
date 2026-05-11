@@ -34,7 +34,16 @@ export default async function StudentResultPage({
     where: { id },
     include: {
       student: true,
-      product: { select: { title: true, thumbnail: true, reviewIncluded: true, userId: true } },
+      product: {
+        select: {
+          title: true,
+          thumbnail: true,
+          userId: true,
+          settings: {
+            select: { reviewIncluded: true },
+          },
+        },
+      },
     },
   });
 
@@ -57,6 +66,8 @@ export default async function StudentResultPage({
       </main>
     );
   }
+
+  const reviewIncluded = result.product.settings?.reviewIncluded ?? false;
 
   // Calculate score category
   const getScoreCategory = (score: number) => {
@@ -209,7 +220,7 @@ export default async function StudentResultPage({
         <StudentResultActions
           resultId={result.id}
           studentName={result.student.buyerName}
-          reviewIncluded={!!result.product?.reviewIncluded}
+          reviewIncluded={reviewIncluded}
         />
 
         {/* Tips */}

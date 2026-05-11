@@ -36,12 +36,12 @@ export async function POST(req: Request) {
       );
     }
 
-    // Get tier for minimum withdrawal
-    const userWithTier = await prisma.user.findUnique({
-      where: { id: session.userId },
+    // Get tier for minimum withdrawal from SellerProfile
+    const profile = await prisma.sellerProfile.findUnique({
+      where: { userId: session.userId },
       select: { sellerTier: true },
     });
-    const minimumWithdrawal = TierServiceClass.getMinimumWithdrawal(userWithTier?.sellerTier || "FREE");
+    const minimumWithdrawal = TierServiceClass.getMinimumWithdrawal(profile?.sellerTier || "FREE");
 
     // Check minimum amount based on tier
     if (withdrawalAmount < minimumWithdrawal) {
@@ -70,7 +70,10 @@ export async function POST(req: Request) {
           status: "COMPLETED",
         },
         include: {
-          product: { select: { price: true, promoPrice: true } },
+          product: {
+            select: { price: true },
+            include: { settings: { select: { promoPrice: true } } },
+          },
           adminFee: true,
           affiliateConversion: true,
         },
@@ -95,7 +98,7 @@ export async function POST(req: Request) {
 
     const totalAffiliateEarnings = affiliateEarnings._sum.commissionAmount || 0;
     const grossRevenue = ownerOrders.reduce(
-      (sum, o) => sum + (o.product?.promoPrice || o.product?.price || 0),
+      (sum, o) => sum + (o.product?.settings?.promoPrice || o.product?.price || 0),
       0
     );
     const totalAffiliateCommission = ownerOrders.reduce(
@@ -123,8 +126,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // Calculate withdrawal fee based on user tier (reuse userWithTier from above)
-    const withdrawalFeeRate = TierServiceClass.getWithdrawalFee(userWithTier?.sellerTier || "FREE");
+    // Calculate withdrawal fee based on user tier
+    const withdrawalFeeRate = TierServiceClass.getWithdrawalFee(profile?.sellerTier || "FREE");
     const feeAmount = calculateWithdrawalFee(withdrawalAmount, withdrawalFeeRate);
     const netAmount = withdrawalAmount - feeAmount;
 
@@ -175,7 +178,7 @@ export async function GET() {
       ownerOrders,
       processedWithdrawals,
       pendingWithdrawals,
-      userWithTier
+      profile
     ] = await Promise.all([
       // Get all withdrawal requests for this user
       prisma.withdrawalRequest.findMany({
@@ -194,7 +197,10 @@ export async function GET() {
           status: "COMPLETED",
         },
         include: {
-          product: { select: { price: true, promoPrice: true } },
+          product: {
+            select: { price: true },
+            include: { settings: { select: { promoPrice: true } } },
+          },
           adminFee: true,
           affiliateConversion: true,
         },
@@ -215,16 +221,16 @@ export async function GET() {
         },
         _sum: { netAmount: true },
       }),
-      // Get user tier for withdrawal fee rate
-      prisma.user.findUnique({
-        where: { id: session.userId },
+      // Get seller profile for tier info
+      prisma.sellerProfile.findUnique({
+        where: { userId: session.userId },
         select: { sellerTier: true },
       }),
     ]);
 
     const totalAffiliateEarnings = affiliateEarnings._sum.commissionAmount || 0;
     const grossRevenue = ownerOrders.reduce(
-      (sum, o) => sum + (o.product?.promoPrice || o.product?.price || 0),
+      (sum, o) => sum + (o.product?.settings?.promoPrice || o.product?.price || 0),
       0
     );
     const totalAffiliateCommission = ownerOrders.reduce(
@@ -240,13 +246,14 @@ export async function GET() {
     const pendingAmount = pendingWithdrawals._sum.netAmount || 0;
     // availableBalance = netOwnSales - sudah dicairkan - pending + komisi affiliate (dari produk orang lain)
     const availableBalance = netOwnSales - totalWithdrawn - pendingAmount + totalAffiliateEarnings;
-    const withdrawalFeeRate = TierServiceClass.getWithdrawalFee(userWithTier?.sellerTier || "FREE");
-    const minimumWithdrawal = TierServiceClass.getMinimumWithdrawal(userWithTier?.sellerTier || "FREE");
+    const sellerTier = profile?.sellerTier || "FREE";
+    const withdrawalFeeRate = TierServiceClass.getWithdrawalFee(sellerTier);
+    const minimumWithdrawal = TierServiceClass.getMinimumWithdrawal(sellerTier);
 
     return NextResponse.json({
       success: true,
       data: {
-        tier: userWithTier?.sellerTier || "FREE",
+        tier: sellerTier,
         withdrawalFeeRate,
         minimumWithdrawal,
         balance: {

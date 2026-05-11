@@ -1,16 +1,7 @@
 /**
  * Midtrans Payment Gateway Integration
  *
- * Setup:
- * 1. Create account at https://midtrans.com
- * 2. Get Server Key and Client Key from Dashboard > Settings > Access Keys
- * 3. Enable payment methods you want to use
- * 4. Set webhook URL to: https://yourdomain.com/api/webhooks/midtrans
- *
- * Environment Variables:
- *   MIDTRANS_SERVER_KEY - Your Midtrans Server Key
- *   MIDTRANS_CLIENT_KEY - Your Midtrans Client Key (public)
- *   NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION - "true" for production, "false" for sandbox
+ * Uses normalized schema pattern: SellerProfile, ProductSettings
  */
 
 import midtransClient from "midtrans-client";
@@ -19,6 +10,8 @@ import { generateAccessToken } from "./generateAccessToken";
 import { OrderStatus, ProductType } from "@/generated/prisma/enums";
 import { sendOrderConfirmation } from "./email";
 import { TierServiceClass } from "./services/TierService";
+import { ProductService } from "./services/ProductService";
+import { SellerService } from "./services/SellerService";
 
 /**
  * Format date for Midtrans expiry
@@ -172,7 +165,9 @@ export async function handleMidtransNotification(
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: {
-      product: true,
+      product: {
+        include: { settings: true },
+      },
     },
   });
 
@@ -235,6 +230,7 @@ export async function handleMidtransNotification(
 
 /**
  * Fulfill order after successful payment
+ * Uses normalized services
  */
 async function fulfillOrder(order: {
   id: string;
@@ -244,14 +240,17 @@ async function fulfillOrder(order: {
   buyerName: string;
   buyerEmail: string;
   buyerWhatsapp: string | null;
+  studentId: string | null;
   product: {
     id: string;
     userId: string;
-    examCredits: number;
     productType: ProductType;
-    promoPrice: number | null;
-    price: number;
     title: string;
+    price: number;
+    settings: {
+      promoPrice: number | null;
+      examCredits: number;
+    } | null;
   };
 }) {
   // Skip if already completed
@@ -271,19 +270,10 @@ async function fulfillOrder(order: {
     data: { status: OrderStatus.COMPLETED },
   });
 
-  // Get seller tier for platform fee calculation
-  const seller = await prisma.user.findUnique({
-    where: { id: order.product.userId },
-    select: { sellerTier: true, customFeeRate: true },
-  });
-
-  // Calculate platform fee based on seller tier (or custom override)
-  const price = order.product.promoPrice || order.product.price;
-  const feeRate = TierServiceClass.getEffectiveFee({
-    sellerTier: seller?.sellerTier || "FREE",
-    customFeeRate: seller?.customFeeRate ?? null,
-  });
-  const fee = Math.floor(price * (feeRate / 100));
+  // Get seller tier for platform fee calculation from SellerProfile
+  const tierInfo = await SellerService.getTierInfo(order.product.userId);
+  const price = order.product.settings?.promoPrice ?? order.product.price;
+  const fee = Math.floor(price * (tierInfo.effectiveFeeRate / 100));
 
   await prisma.adminPlatformFee.create({
     data: {
@@ -313,58 +303,78 @@ async function fulfillOrder(order: {
         },
       });
 
+      // Add commission to affiliate's balance
+      await SellerService.addToBalance(enrollment.affiliateUserId, commission);
+
       console.log(`[Midtrans] Affiliate commission created: Rp ${commission} for user ${enrollment.affiliateUserId}`);
     }
   }
 
   // Fulfill TOEFL simulation
   if (order.product.productType === ProductType.TOEFL_SIMULATION) {
+    // StudentAccount sudah dibuat di createOrder(), tinggal link jika belum
     let student = await prisma.studentAccount.findUnique({
       where: { buyerEmail: order.buyerEmail },
     });
 
-    if (!student) {
-      student = await prisma.studentAccount.create({
-        data: {
-          buyerName: order.buyerName,
-          buyerEmail: order.buyerEmail,
-          buyerWhatsapp: order.buyerWhatsapp,
-          accessToken: generateAccessToken(),
-          ownerUserId: order.product.userId,
+    if (student) {
+      // Link order to student only if not already linked
+      if (!order.studentId) {
+        await prisma.order.update({
+          where: { id: order.id },
+          data: { studentId: student.id },
+        });
+      }
+
+      // Create or update exam credits
+      const examCredits = order.product.settings?.examCredits || 1;
+      const existingCredit = await prisma.studentExamCredit.findFirst({
+        where: {
+          studentId: student.id,
+          productId: order.product.id,
         },
       });
-    }
 
-    // Link order to student
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { studentId: student.id },
-    });
+      if (existingCredit) {
+        // Add credits to existing record
+        await prisma.studentExamCredit.update({
+          where: { id: existingCredit.id },
+          data: {
+            totalCredit: existingCredit.totalCredit + examCredits,
+          },
+        });
+      } else {
+        await prisma.studentExamCredit.create({
+          data: {
+            studentId: student.id,
+            totalCredit: examCredits,
+            productId: order.product.id,
+          },
+        });
+      }
 
-    // Create exam credits
-    await prisma.studentExamCredit.create({
-      data: {
-        studentId: student.id,
-        totalCredit: order.product.examCredits,
-        productId: order.product.id,
-      },
-    });
-
-    // Send confirmation email with access token
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    try {
-      await sendOrderConfirmation(order.buyerEmail, {
-        orderId: order.id,
-        productName: order.product.title,
-        amount: price,
-        buyerName: order.buyerName,
-        accessToken: student.accessToken,
-        examCredits: order.product.examCredits,
-        dashboardUrl: `${appUrl}/student/dashboard`,
-        loginUrl: `${appUrl}/student/login`,
+      // Update student total purchased
+      await prisma.studentAccount.update({
+        where: { id: student.id },
+        data: { totalPurchased: { increment: price } },
       });
-    } catch (emailError) {
-      console.error("[Midtrans] Failed to send confirmation email:", emailError);
+
+      // Send confirmation email with access token
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      try {
+        await sendOrderConfirmation(order.buyerEmail, {
+          orderId: order.id,
+          productName: order.product.title,
+          amount: price,
+          buyerName: order.buyerName,
+          accessToken: student.accessToken,
+          examCredits: examCredits,
+          dashboardUrl: `${appUrl}/student/dashboard`,
+          loginUrl: `${appUrl}/student/login`,
+        });
+      } catch (emailError) {
+        console.error("[Midtrans] Failed to send confirmation email:", emailError);
+      }
     }
   }
 

@@ -53,6 +53,7 @@ export default function ExamMonitoringPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -69,14 +70,21 @@ export default function ExamMonitoringPage() {
       console.error("Failed to fetch:", err);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000); // Refresh every 30 seconds
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    fetchData();
+  };
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -193,8 +201,14 @@ export default function ExamMonitoringPage() {
                   Last update: {lastUpdate.toLocaleTimeString()}
                 </span>
               )}
-              <Button onClick={fetchData} variant="outline" size="sm" className="gap-2">
-                <RefreshCw className="h-4 w-4" />
+              {isRefreshing && (
+                <span className="text-xs text-blue-500 flex items-center gap-1">
+                  <RefreshCw className="h-3 w-3 animate-spin" />
+                  Refreshing...
+                </span>
+              )}
+              <Button onClick={handleRefresh} variant="outline" size="sm" className="gap-2" disabled={isRefreshing}>
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
                 Refresh
               </Button>
             </div>

@@ -13,21 +13,27 @@ export async function POST(req: Request) {
       select: { avatar: true },
     });
 
-    const data = {
-      headline: formData.get("headline") as string || null,
-      bio: formData.get("bio") as string || null,
-      whatsapp: formData.get("whatsapp") as string || null,
-      avatar: formData.get("avatar") as string || null,
-      ctaText: formData.get("ctaText") as string || null,
-    };
+    const avatar = formData.get("avatar") as string || null;
 
+    // Update User.avatar only
     await prisma.user.update({
       where: { id: user.id },
-      data,
+      data: { avatar },
+    });
+
+    // Update SellerProfile for microsite fields
+    await prisma.sellerProfile.update({
+      where: { userId: user.id },
+      data: {
+        headline: formData.get("headline") as string || null,
+        bio: formData.get("bio") as string || null,
+        whatsapp: formData.get("whatsapp") as string || null,
+        ctaText: formData.get("ctaText") as string || null,
+      },
     });
 
     // Clean up old avatar if changed
-    if (currentUser?.avatar && currentUser.avatar !== data.avatar) {
+    if (currentUser?.avatar && currentUser.avatar !== avatar) {
       await deleteStorageFile(currentUser.avatar);
     }
 

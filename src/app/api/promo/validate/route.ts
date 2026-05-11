@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     // Check if promo belongs to the product owner
     const product = await prisma.product.findUnique({
       where: { id: productId },
-      select: { userId: true, price: true, promoPrice: true },
+      include: { settings: { select: { promoPrice: true } } },
     });
 
     if (!product) {
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
     }
 
     // Calculate price after any existing promo
-    const price = product.promoPrice || product.price;
+    const price = product.settings?.promoPrice || product.price;
 
     // Check minimum purchase
     if (promoCode.minPurchase > 0 && price < promoCode.minPurchase) {

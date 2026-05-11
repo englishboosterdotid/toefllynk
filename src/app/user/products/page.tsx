@@ -12,18 +12,20 @@ type Product = {
   title: string;
   description: string;
   price: number;
-  promoPrice: number | null;
   thumbnail: string | null;
-  affiliateEnabled: boolean;
-  isArchived: boolean;
-  isVisibleOnMicrosite: boolean;
-  isFeatured: boolean;
-  packageType: string | null;
   productType: string;
-  examCredits: number;
-  certificateIncluded: boolean;
-  reviewIncluded: boolean;
-  zoomIncluded: boolean;
+  settings?: {
+    promoPrice: number | null;
+    affiliateEnabled: boolean;
+    isArchived: boolean;
+    isVisibleOnMicrosite: boolean;
+    isFeatured: boolean;
+    packageType: string | null;
+    examCredits: number;
+    certificateIncluded: boolean;
+    reviewIncluded: boolean;
+    zoomIncluded: boolean;
+  } | null;
 };
 
 type TierInfo = {
@@ -65,7 +67,8 @@ export default function ProductsPage() {
               {error === "max_featured" && `Maksimal ${searchParams.get("count") || 3} produk dapat ditandai sebagai unggulan.`}
               {error === "unauthorized" && "Anda tidak memiliki akses ke produk ini."}
               {error === "product_required" && "Produk tidak ditemukan."}
-              {!["featured_requires_pro", "max_featured", "unauthorized", "product_required"].includes(error) && "Terjadi kesalahan. Silakan coba lagi."}
+              {error === "max_microsite" && (searchParams.get("message") || "Batas produk microsite tercapai.")}
+              {!["featured_requires_pro", "max_featured", "unauthorized", "product_required", "max_microsite"].includes(error) && "Terjadi kesalahan. Silakan coba lagi."}
             </p>
           </div>
         </div>
@@ -141,17 +144,17 @@ export default function ProductsPage() {
               title={product.title}
               description={product.description}
               price={product.price}
-              promoPrice={product.promoPrice}
               thumbnail={product.thumbnail}
-              affiliateEnabled={product.affiliateEnabled}
-              isArchived={product.isArchived}
-              isVisibleOnMicrosite={product.isVisibleOnMicrosite}
-              isFeatured={product.isFeatured}
-              packageType={product.packageType}
-              examCredits={product.examCredits}
-              certificateIncluded={product.certificateIncluded}
-              reviewIncluded={product.reviewIncluded}
-              zoomIncluded={product.zoomIncluded}
+              promoPrice={product.settings?.promoPrice}
+              affiliateEnabled={product.settings?.affiliateEnabled}
+              isArchived={product.settings?.isArchived}
+              isVisibleOnMicrosite={product.settings?.isVisibleOnMicrosite}
+              isFeatured={product.settings?.isFeatured}
+              packageType={product.settings?.packageType}
+              examCredits={product.settings?.examCredits}
+              certificateIncluded={product.settings?.certificateIncluded}
+              reviewIncluded={product.settings?.reviewIncluded}
+              zoomIncluded={product.settings?.zoomIncluded}
             />
           ))}
         </div>

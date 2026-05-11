@@ -1,5 +1,5 @@
 export { BaseRepository, type PaginationOptions, type PaginatedResult } from "./base.repository";
-export { UserRepository, userRepository, type UserPublic, type UserWithStudent } from "./user.repository";
+export { UserRepository, userRepository, type UserPublic } from "./user.repository";
 export { ProductRepository, productRepository, type ProductWithUser, type ProductBasic } from "./product.repository";
 export { OrderRepository, orderRepository, type OrderWithDetails, type OrderBasic } from "./order.repository";
 export { StudentRepository, studentRepository, type StudentBasic, type StudentWithCredits } from "./student.repository";

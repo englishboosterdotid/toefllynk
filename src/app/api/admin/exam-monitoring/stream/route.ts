@@ -66,11 +66,28 @@ export async function GET(req: Request) {
           });
           sendEvent("active_count", { count: activeCount });
 
-          // Warning count
-          const warningCount = await prisma.examActivityLog.count({
-            where: { activityType: { in: ["TAB_SWITCH", "FULLSCREEN_EXIT"] } },
+          // Flagged sessions (sessions with warnings)
+          const flaggedCount = await prisma.examSession.count({
+            where: {
+              status: "IN_PROGRESS",
+              activityLogs: {
+                some: {
+                  activityType: { in: ["TAB_SWITCH", "FULLSCREEN_EXIT"] },
+                },
+              },
+            },
           });
-          sendEvent("warning_count", { count: warningCount });
+          sendEvent("flagged_count", { count: flaggedCount });
+
+          // Auto-submitted in 24h
+          const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+          const autoSubmittedCount = await prisma.examActivityLog.count({
+            where: {
+              activityType: "AUTO_SUBMIT",
+              createdAt: { gte: twentyFourHoursAgo },
+            },
+          });
+          sendEvent("auto_submit_24h", { count: autoSubmittedCount });
         } catch (err) {
           console.error("SSE Initial Error:", err);
         }

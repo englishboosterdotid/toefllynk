@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Globe, Eye, EyeOff, Save, Link2, Mail, Phone, MapPin } from "lucide-react";
+import { Globe, Eye, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -316,118 +316,6 @@ export default function MicrositeSettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Social Links */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Link2 className="h-5 w-5" />
-            Link Sosial Media
-          </CardTitle>
-          <CardDescription>Tambahkan link ke sosial media Anda</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="socialInstagram">Instagram</Label>
-              <Input
-                id="socialInstagram"
-                value={settings.socialInstagram || ""}
-                onChange={(e) => setSettings({ ...settings, socialInstagram: e.target.value })}
-                placeholder="@username"
-              />
-            </div>
-            <div>
-              <Label htmlFor="socialFacebook">Facebook</Label>
-              <Input
-                id="socialFacebook"
-                value={settings.socialFacebook || ""}
-                onChange={(e) => setSettings({ ...settings, socialFacebook: e.target.value })}
-                placeholder="facebook.com/page"
-              />
-            </div>
-            <div>
-              <Label htmlFor="socialTwitter">Twitter/X</Label>
-              <Input
-                id="socialTwitter"
-                value={settings.socialTwitter || ""}
-                onChange={(e) => setSettings({ ...settings, socialTwitter: e.target.value })}
-                placeholder="@username"
-              />
-            </div>
-            <div>
-              <Label htmlFor="socialYoutube">YouTube</Label>
-              <Input
-                id="socialYoutube"
-                value={settings.socialYoutube || ""}
-                onChange={(e) => setSettings({ ...settings, socialYoutube: e.target.value })}
-                placeholder="youtube.com/channel"
-              />
-            </div>
-            <div>
-              <Label htmlFor="socialTiktok">TikTok</Label>
-              <Input
-                id="socialTiktok"
-                value={settings.socialTiktok || ""}
-                onChange={(e) => setSettings({ ...settings, socialTiktok: e.target.value })}
-                placeholder="@username"
-              />
-            </div>
-            <div>
-              <Label htmlFor="socialLinkedin">LinkedIn</Label>
-              <Input
-                id="socialLinkedin"
-                value={settings.socialLinkedin || ""}
-                onChange={(e) => setSettings({ ...settings, socialLinkedin: e.target.value })}
-                placeholder="linkedin.com/in/username"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Contact Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5" />
-            Informasi Kontak
-          </CardTitle>
-          <CardDescription>Tambahkan informasi kontak di microsite</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="contactEmail">Email</Label>
-              <Input
-                id="contactEmail"
-                type="email"
-                value={settings.contactEmail || ""}
-                onChange={(e) => setSettings({ ...settings, contactEmail: e.target.value })}
-                placeholder="contact@example.com"
-              />
-            </div>
-            <div>
-              <Label htmlFor="contactPhone">WhatsApp/Telepon</Label>
-              <Input
-                id="contactPhone"
-                value={settings.contactPhone || ""}
-                onChange={(e) => setSettings({ ...settings, contactPhone: e.target.value })}
-                placeholder="+6281234567890"
-              />
-            </div>
-          </div>
-          <div>
-            <Label htmlFor="contactAddress">Alamat</Label>
-            <Textarea
-              id="contactAddress"
-              value={settings.contactAddress || ""}
-              onChange={(e) => setSettings({ ...settings, contactAddress: e.target.value })}
-              placeholder="Jl. Contoh No. 123, Jakarta"
-              className="h-20"
-            />
-          </div>
-        </CardContent>
-      </Card>
-    </main>
+          </main>
   );
 }

@@ -5,15 +5,15 @@ type ProductCardProps = {
   price: number;
   promoPrice?: number | null;
   thumbnail?: string | null;
-  affiliateEnabled: boolean;
-  isArchived: boolean;
-  isVisibleOnMicrosite: boolean;
+  affiliateEnabled?: boolean;
+  isArchived?: boolean;
+  isVisibleOnMicrosite?: boolean;
   isFeatured?: boolean;
   packageType?: string | null;
-  examCredits: number;
-  certificateIncluded: boolean;
-  reviewIncluded: boolean;
-  zoomIncluded: boolean;
+  examCredits?: number;
+  certificateIncluded?: boolean;
+  reviewIncluded?: boolean;
+  zoomIncluded?: boolean;
 };
 
 export default function ProductCard({
@@ -23,9 +23,9 @@ export default function ProductCard({
   price,
   promoPrice,
   thumbnail,
-  affiliateEnabled,
-  isArchived,
-  isVisibleOnMicrosite,
+  affiliateEnabled = false,
+  isArchived = false,
+  isVisibleOnMicrosite = true,
   isFeatured = false,
   packageType,
   examCredits,
@@ -46,15 +46,19 @@ export default function ProductCard({
   const isBundle = packageType === "BUNDLE";
 
   return (
-    <div className={`bg-white rounded-3xl shadow p-5 ${isVisibleOnMicrosite ? "ring-2 ring-green-400" : ""}`}>
+    <div className={`bg-white rounded-3xl shadow p-5 ${isVisibleOnMicrosite ? "ring-2 ring-green-400" : ""} ${isArchived ? "opacity-75" : ""}`}>
       {thumbnail && (
         <img src={thumbnail} className="w-full h-44 object-cover rounded-2xl mb-4" />
+      )}
+
+      {isArchived && (
+        <div className="absolute inset-0 bg-slate-900/10 rounded-2xl pointer-events-none" />
       )}
 
       <div className="flex justify-between items-start mb-3">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <p className="text-xs text-blue-500 font-semibold">
+            <p className={`text-xs font-semibold ${isArchived ? "text-slate-400" : "text-blue-500"}`}>
               {isBundle ? "BUNDLE PACKAGE" : packageType || "INDIVIDUAL PACKAGE"}
             </p>
             {isFeatured && (
@@ -63,12 +67,14 @@ export default function ProductCard({
               </span>
             )}
           </div>
-          <h3 className="text-xl font-bold">{title}</h3>
+          <h3 className={`text-xl font-bold ${isArchived ? "text-slate-400" : ""}`}>{title}</h3>
         </div>
 
         <div className="flex flex-col items-end gap-1">
-          <span className="text-xs bg-gray-100 px-3 py-1 rounded-full">{status}</span>
-          {isVisibleOnMicrosite && (
+          <span className={`text-xs px-3 py-1 rounded-full ${isArchived ? "bg-slate-200 text-slate-600" : "bg-gray-100"}`}>
+            {status}
+          </span>
+          {isVisibleOnMicrosite && !isArchived && (
             <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full">
               Visible
             </span>
@@ -112,8 +118,12 @@ export default function ProductCard({
 
         <form action="/api/products/archive" method="POST">
           <input type="hidden" name="productId" value={id} />
-          <button className="bg-red-50 text-red-500 px-4 py-2 rounded-full text-sm">
-            {isArchived ? "Reopen Program" : "Close Program"}
+          <button className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+            isArchived
+              ? "bg-green-50 text-green-600 hover:bg-green-100 border border-green-200"
+              : "bg-red-50 text-red-500 hover:bg-red-100"
+          }`}>
+            {isArchived ? "🔄 Reopen Program" : "Close Program"}
           </button>
         </form>
 

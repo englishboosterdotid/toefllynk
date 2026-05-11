@@ -57,6 +57,8 @@ export async function PUT(req: Request) {
       backgroundImage,
     } = body;
 
+    const normalizedValidityDays = validityDays !== undefined && validityDays !== null ? Number(validityDays) : 365;
+
     const template = await prisma.certificateTemplate.upsert({
       where: { userId: session.userId },
       create: {
@@ -68,7 +70,7 @@ export async function PUT(req: Request) {
         logoUrl: logoUrl || null,
         signatureText: signatureText || "Authorized Signature",
         footerText: footerText || null,
-        validityDays: validityDays !== undefined ? validityDays : 365,
+        validityDays: normalizedValidityDays,
         fontFamily: fontFamily || "Inter",
         backgroundImage: backgroundImage || null,
       },
@@ -80,7 +82,7 @@ export async function PUT(req: Request) {
         logoUrl: logoUrl !== undefined ? logoUrl : undefined,
         signatureText: signatureText !== undefined ? signatureText : undefined,
         footerText: footerText !== undefined ? footerText : undefined,
-        validityDays: validityDays !== undefined ? validityDays : undefined,
+        validityDays: normalizedValidityDays,
         fontFamily: fontFamily !== undefined ? fontFamily : undefined,
         backgroundImage: backgroundImage !== undefined ? backgroundImage : undefined,
       },

@@ -544,8 +544,11 @@ export default function StudentExamPage() {
     }
   };
 
-  // Auto-play audio for LISTENING
+  // Auto-play audio for LISTENING (only when secure mode is active)
   useEffect(() => {
+    // Only auto-play if secure mode is active (fullscreen entered)
+    if (!isSecureMode) return;
+
     // Reset playing state when question changes
     setIsPlaying(false);
     setAudioProgress(0);
@@ -586,7 +589,7 @@ export default function StudentExamPage() {
       clearTimeout(timer);
       audioPlayPromiseRef.current = null;
     };
-  }, [current, question]);
+  }, [current, question, isSecureMode]);
 
   // Audio progress tracking
   useEffect(() => {

@@ -6,7 +6,7 @@ services:
     container_name: toefllynk-db
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: passwordku
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-toefllynk}
       POSTGRES_DB: toefllynk
     ports:
       - "5432:5432"
@@ -17,6 +17,16 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: toefllynk-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
 
   app:
     build:
@@ -26,11 +36,41 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://postgres:passwordku@db:5432/toefllynk
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-toefllynk}@db:5432/toefllynk
       NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-http://localhost:3000}
+      NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION: ${MIDTRANS_IS_PRODUCTION:-false}
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-}
+      NEXT_PUBLIC_MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY:-}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-nodemailer}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
+      LOCAL_STORAGE_PATH: /app/uploads
+      LOCAL_STORAGE_BASE_URL: /uploads
+    volumes:
+      - uploads:/app/uploads
+      - ./public/uploads:/app/uploads:delegated
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   postgres_data:
+  redis_data:
+  uploads:

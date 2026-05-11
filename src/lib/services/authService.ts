@@ -1,8 +1,9 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
+import { cookies as nextCookies } from "next/headers";
 import { Role } from "@/generated/prisma/enums";
-import { userRepository } from "@/lib/repositories";
+import prisma from "@/lib/prisma";
 import { setAuthCookie, deleteAuthCookie } from "@/lib/cookies";
 import { RESERVED_USERNAMES } from "@/lib/constants";
 
@@ -19,17 +20,18 @@ export interface AuthUser {
   name: string | null;
   role: Role;
   avatar: string | null;
-  bio: string | null;
-  whatsapp: string | null;
-  headline: string | null;
-  ctaText: string | null;
-  sellerTier: string;
-  subscriptionEnd: Date | null;
-  customFeeRate: number | null;
-  customDomain: string | null;
-  domainVerified: boolean;
   createdAt: Date;
   hasStudentAccount: boolean;
+  // Profile fields
+  bio?: string | null;
+  whatsapp?: string | null;
+  headline?: string | null;
+  ctaText?: string | null;
+  sellerTier?: string;
+  subscriptionEnd?: Date | null;
+  customFeeRate?: number | null;
+  customDomain?: string | null;
+  domainVerified?: boolean;
 }
 
 export interface LoginResult {
@@ -68,13 +70,46 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     const decoded = verifyToken(token);
     if (!decoded) return null;
 
-    const user = await userRepository.findByIdWithStudent(decoded.userId);
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      include: {
+        profile: {
+          select: {
+            bio: true,
+            whatsapp: true,
+            headline: true,
+            ctaText: true,
+            sellerTier: true,
+            subscriptionEnd: true,
+            customFeeRate: true,
+            customDomain: true,
+            domainVerified: true,
+          },
+        },
+        studentProfile: { select: { id: true } },
+      },
+    });
 
     if (!user) return null;
 
     return {
-      ...user,
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      name: user.name,
+      role: user.role,
+      avatar: user.avatar,
+      createdAt: user.createdAt,
       hasStudentAccount: !!user.studentProfile,
+      bio: user.profile?.bio,
+      whatsapp: user.profile?.whatsapp,
+      headline: user.profile?.headline,
+      ctaText: user.profile?.ctaText,
+      sellerTier: user.profile?.sellerTier,
+      subscriptionEnd: user.profile?.subscriptionEnd,
+      customFeeRate: user.profile?.customFeeRate,
+      customDomain: user.profile?.customDomain,
+      domainVerified: user.profile?.domainVerified,
     };
   } catch {
     return null;
@@ -83,7 +118,21 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
 export async function login(email: string, password: string): Promise<LoginResult> {
   try {
-    const user = await userRepository.findByEmail(email);
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: {
+        profile: {
+          select: {
+            sellerTier: true,
+            subscriptionEnd: true,
+            customFeeRate: true,
+            customDomain: true,
+            domainVerified: true,
+          },
+        },
+        studentProfile: { select: { id: true } },
+      },
+    });
 
     if (!user) {
       return { success: false, error: "Email atau password salah" };
@@ -93,9 +142,6 @@ export async function login(email: string, password: string): Promise<LoginResul
     if (!isValid) {
       return { success: false, error: "Email atau password salah" };
     }
-
-    // Get full user data for response
-    const fullUser = await userRepository.findById(user.id);
 
     const token = generateToken(user.id, user.email, user.username, user.role);
     await setAuthCookie(token);
@@ -109,17 +155,13 @@ export async function login(email: string, password: string): Promise<LoginResul
         name: user.name,
         role: user.role,
         avatar: user.avatar,
-        bio: user.bio,
-        whatsapp: user.whatsapp,
-        headline: user.headline,
-        ctaText: user.ctaText,
-        sellerTier: fullUser?.sellerTier || "FREE",
-        subscriptionEnd: fullUser?.subscriptionEnd || null,
-        customFeeRate: fullUser?.customFeeRate || null,
-        customDomain: fullUser?.customDomain || null,
-        domainVerified: fullUser?.domainVerified || false,
-        createdAt: fullUser?.createdAt || new Date(),
+        createdAt: user.createdAt,
         hasStudentAccount: !!user.studentProfile,
+        sellerTier: user.profile?.sellerTier,
+        subscriptionEnd: user.profile?.subscriptionEnd,
+        customFeeRate: user.profile?.customFeeRate,
+        customDomain: user.profile?.customDomain,
+        domainVerified: user.profile?.domainVerified,
       },
     };
   } catch (error) {
@@ -140,23 +182,30 @@ export async function register(
       return { success: false, error: "Username ini tidak tersedia" };
     }
 
-    const existingEmail = await userRepository.checkEmailExists(email);
-    if (existingEmail) {
+    const existingEmail = await prisma.user.count({ where: { email } });
+    if (existingEmail > 0) {
       return { success: false, error: "Email sudah terdaftar" };
     }
 
-    const existingUsername = await userRepository.checkUsernameExists(username);
-    if (existingUsername) {
+    const existingUsername = await prisma.user.count({ where: { username } });
+    if (existingUsername > 0) {
       return { success: false, error: "Username sudah digunakan" };
     }
 
     const hashedPassword = await hashPassword(password);
 
-    const user = await userRepository.create({
-      name,
-      email,
-      password: hashedPassword,
-      username,
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        username,
+        profile: {
+          create: {
+            sellerTier: "FREE",
+          },
+        },
+      },
     });
 
     const token = generateToken(user.id, user.email, user.username, user.role);
@@ -165,7 +214,13 @@ export async function register(
     return {
       success: true,
       user: {
-        ...user,
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        name: user.name,
+        role: user.role,
+        avatar: user.avatar,
+        createdAt: user.createdAt,
         hasStudentAccount: false,
       },
     };
@@ -183,23 +238,79 @@ export async function updateProfile(
   userId: string,
   data: Partial<{
     name: string;
-    bio: string;
-    whatsapp: string;
     avatar: string;
+    bio: string;
     headline: string;
     ctaText: string;
+    whatsapp: string;
   }>
 ): Promise<AuthUser | null> {
   try {
-    const user = await userRepository.update(userId, data);
+    // Update user basic info
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        name: data.name,
+        avatar: data.avatar,
+      },
+    });
 
-    if (!user) return null;
+    // Update seller profile if provided
+    const profileData: Record<string, unknown> = {};
+    if (data.bio !== undefined) profileData.bio = data.bio;
+    if (data.headline !== undefined) profileData.headline = data.headline;
+    if (data.ctaText !== undefined) profileData.ctaText = data.ctaText;
+    if (data.whatsapp !== undefined) profileData.whatsapp = data.whatsapp;
 
-    const userWithStudent = await userRepository.findByIdWithStudent(userId);
+    if (Object.keys(profileData).length > 0) {
+      await prisma.sellerProfile.upsert({
+        where: { userId },
+        create: { userId, ...profileData },
+        update: profileData,
+      });
+    }
+
+    // Get updated user with profile
+    const updatedUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        profile: {
+          select: {
+            bio: true,
+            whatsapp: true,
+            headline: true,
+            ctaText: true,
+            sellerTier: true,
+            subscriptionEnd: true,
+            customFeeRate: true,
+            customDomain: true,
+            domainVerified: true,
+          },
+        },
+        studentProfile: { select: { id: true } },
+      },
+    });
+
+    if (!updatedUser) return null;
 
     return {
-      ...user,
-      hasStudentAccount: !!userWithStudent?.studentProfile,
+      id: updatedUser.id,
+      email: updatedUser.email,
+      username: updatedUser.username,
+      name: updatedUser.name,
+      role: updatedUser.role,
+      avatar: updatedUser.avatar,
+      createdAt: updatedUser.createdAt,
+      hasStudentAccount: !!updatedUser.studentProfile,
+      bio: updatedUser.profile?.bio,
+      whatsapp: updatedUser.profile?.whatsapp,
+      headline: updatedUser.profile?.headline,
+      ctaText: updatedUser.profile?.ctaText,
+      sellerTier: updatedUser.profile?.sellerTier,
+      subscriptionEnd: updatedUser.profile?.subscriptionEnd,
+      customFeeRate: updatedUser.profile?.customFeeRate,
+      customDomain: updatedUser.profile?.customDomain,
+      domainVerified: updatedUser.profile?.domainVerified,
     };
   } catch (error) {
     console.error("Update profile error:", error);

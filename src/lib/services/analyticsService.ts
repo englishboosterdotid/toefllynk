@@ -27,7 +27,7 @@ export async function getUserAnalytics(
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { sellerTier: true },
+      select: { id: true },
     });
 
     if (!user) {
@@ -114,12 +114,8 @@ export async function getTopProducts(
 
     const products = await prisma.product.findMany({
       where: { userId },
-      select: {
-        id: true,
-        title: true,
-        thumbnail: true,
-        price: true,
-        promoPrice: true,
+      include: {
+        settings: { select: { promoPrice: true } },
         _count: {
           select: { orders: true },
         },
@@ -136,7 +132,10 @@ export async function getTopProducts(
       select: {
         productId: true,
         product: {
-          select: { promoPrice: true, price: true },
+          select: {
+            price: true,
+            settings: { select: { promoPrice: true } },
+          },
         },
       },
     });
@@ -144,7 +143,7 @@ export async function getTopProducts(
     // Calculate revenue per product
     const productRevenue: Record<string, number> = {};
     orders.forEach((o) => {
-      const price = o.product.promoPrice || o.product.price;
+      const price = o.product.settings?.promoPrice || o.product.price;
       productRevenue[o.productId] = (productRevenue[o.productId] || 0) + price;
     });
 
@@ -211,14 +210,17 @@ export async function checkAnalyticsAccess(
 ): Promise<{ hasAccess: boolean; level: "basic" | "full" | "advanced"; error?: string }> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { sellerTier: true },
+    select: {
+      id: true,
+      profile: { select: { sellerTier: true } },
+    },
   });
 
   if (!user) {
     return { hasAccess: false, level: "basic", error: "User tidak ditemukan" };
   }
 
-  const tierConfig = TierServiceClass.getConfig(user.sellerTier as SellerTier);
+  const tierConfig = TierServiceClass.getConfig(user.profile?.sellerTier as SellerTier);
 
   let level: "basic" | "full" | "advanced" = "basic";
   if (tierConfig.analyticsLevel === "full") level = "full";

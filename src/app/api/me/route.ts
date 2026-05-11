@@ -13,14 +13,28 @@ export async function GET() {
       name: true,
       email: true,
       username: true,
-      headline: true,
-      bio: true,
-      whatsapp: true,
       avatar: true,
-      ctaText: true,
       role: true,
+      profile: {
+        select: {
+          headline: true,
+          bio: true,
+          whatsapp: true,
+          ctaText: true,
+        },
+      },
     },
   });
 
-  return Response.json({ user });
+  if (!user) return Response.json({ user: null });
+
+  return Response.json({
+    user: {
+      ...user,
+      headline: user.profile?.headline,
+      bio: user.profile?.bio,
+      whatsapp: user.profile?.whatsapp,
+      ctaText: user.profile?.ctaText,
+    },
+  });
 }

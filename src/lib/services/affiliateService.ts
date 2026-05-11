@@ -65,8 +65,8 @@ export async function createAffiliateEnrollment(data: {
             id: true,
             title: true,
             price: true,
-            promoPrice: true,
             thumbnail: true,
+            settings: { select: { promoPrice: true } },
           },
         },
         affiliateUser: {
@@ -107,8 +107,8 @@ export async function getAffiliateEnrollmentsByUser(userId: string) {
           id: true,
           title: true,
           price: true,
-          promoPrice: true,
           thumbnail: true,
+          settings: { select: { promoPrice: true } },
           user: {
             select: {
               id: true,
@@ -126,7 +126,10 @@ export async function getAffiliateProducts(ownerUserId: string) {
   return prisma.product.findMany({
     where: {
       userId: ownerUserId,
-      isArchived: false,
+      settings: { isArchived: false },
+    },
+    include: {
+      settings: { select: { promoPrice: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -147,7 +150,7 @@ export async function getAffiliateConversions(userId: string) {
               id: true,
               title: true,
               price: true,
-              promoPrice: true,
+              settings: { select: { promoPrice: true } },
             },
           },
         },
@@ -176,17 +179,15 @@ export async function getAffiliateLinkByCode(referralCode: string) {
           id: true,
           title: true,
           price: true,
-          promoPrice: true,
           thumbnail: true,
+          settings: { select: { promoPrice: true } },
           user: {
             select: {
               id: true,
               name: true,
               username: true,
               avatar: true,
-              headline: true,
-              ctaText: true,
-              whatsapp: true,
+              profile: { select: { headline: true, ctaText: true, whatsapp: true } },
             },
           },
         },

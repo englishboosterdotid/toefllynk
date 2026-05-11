@@ -36,25 +36,26 @@ export async function POST(req: Request) {
     // If setting as featured, check limit
     if (featured) {
       const currentFeaturedCount = await prisma.product.count({
-        where: { userId: user.id, isFeatured: true },
+        where: { userId: user.id, settings: { isFeatured: true } },
       });
 
       // Don't count the current product if it's already featured
       const existingFeatured = await prisma.product.findUnique({
         where: { id: productId },
-        select: { isFeatured: true },
+        include: { settings: { select: { isFeatured: true } } },
       });
 
-      const effectiveCount = existingFeatured?.isFeatured ? currentFeaturedCount - 1 : currentFeaturedCount;
+      const effectiveCount = existingFeatured?.settings?.isFeatured ? currentFeaturedCount - 1 : currentFeaturedCount;
 
       if (effectiveCount >= MAX_FEATURED_PRODUCTS) {
         return NextResponse.redirect(new URL(`/user/products?error=max_featured&count=${MAX_FEATURED_PRODUCTS}`, req.url));
       }
     }
 
-    await prisma.product.update({
-      where: { id: productId },
-      data: { isFeatured: featured },
+    await prisma.productSettings.upsert({
+      where: { productId },
+      create: { productId, isFeatured: featured },
+      update: { isFeatured: featured },
     });
 
     return NextResponse.redirect(new URL("/user/products", req.url));

@@ -26,9 +26,9 @@ export interface CustomerListResult {
 async function getUserTier(userId: string): Promise<SellerTier> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { sellerTier: true },
+    select: { profile: { select: { sellerTier: true } } },
   });
-  return (user?.sellerTier || "FREE") as SellerTier;
+  return (user?.profile?.sellerTier || "FREE") as SellerTier;
 }
 
 export async function getCustomersByOwner(
@@ -197,14 +197,14 @@ export async function exportCustomers(
     // Check tier - PRO+ only
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { sellerTier: true },
+      select: { profile: { select: { sellerTier: true } } },
     });
 
     if (!user) {
       return { success: false, error: "User tidak ditemukan" };
     }
 
-    const tierConfig = TierServiceClass.getConfig(user.sellerTier as SellerTier);
+    const tierConfig = TierServiceClass.getConfig(user.profile?.sellerTier as SellerTier);
     if (!tierConfig.hasExportCustomer) {
       return { success: false, error: "Fitur export customer hanya untuk PRO+" };
     }

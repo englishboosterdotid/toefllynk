@@ -9,27 +9,41 @@ const SELECT_PUBLIC_FIELDS = {
   name: true,
   role: true,
   avatar: true,
-  bio: true,
-  whatsapp: true,
-  headline: true,
-  ctaText: true,
-  sellerTier: true,
-  subscriptionEnd: true,
-  customFeeRate: true,
-  customDomain: true,
-  domainVerified: true,
   createdAt: true,
 } as const;
 
-const SELECT_WITH_STUDENT = {
+const SELECT_FULL_FIELDS = {
   ...SELECT_PUBLIC_FIELDS,
+  profile: {
+    select: {
+      id: true,
+      bio: true,
+      headline: true,
+      ctaText: true,
+      whatsapp: true,
+      sellerTier: true,
+      subscriptionEnd: true,
+      customFeeRate: true,
+      customDomain: true,
+      domainVerified: true,
+      balance: true,
+    },
+  },
+  bankAccount: {
+    select: {
+      id: true,
+      bankName: true,
+      bankAccount: true,
+      bankHolder: true,
+    },
+  },
   studentProfile: {
     select: { id: true },
   },
 } as const;
 
 export type UserPublic = Prisma.UserGetPayload<{ select: typeof SELECT_PUBLIC_FIELDS }>;
-export type UserWithStudent = Prisma.UserGetPayload<{ select: typeof SELECT_WITH_STUDENT }>;
+export type UserFull = Prisma.UserGetPayload<{ select: typeof SELECT_FULL_FIELDS }>;
 
 export class UserRepository extends BaseRepository {
   async findById(id: string): Promise<UserPublic | null> {
@@ -39,10 +53,10 @@ export class UserRepository extends BaseRepository {
     });
   }
 
-  async findByIdWithStudent(id: string): Promise<UserWithStudent | null> {
+  async findByIdWithProfile(id: string): Promise<UserFull | null> {
     return prisma.user.findUnique({
       where: { id },
-      select: SELECT_WITH_STUDENT,
+      select: SELECT_FULL_FIELDS,
     });
   }
 
@@ -50,6 +64,7 @@ export class UserRepository extends BaseRepository {
     return prisma.user.findUnique({
       where: { email },
       include: {
+        profile: true,
         studentProfile: { select: { id: true } },
       },
     });
@@ -67,14 +82,16 @@ export class UserRepository extends BaseRepository {
       where: { username },
       include: {
         products: {
-          where: { isArchived: false },
+          where: { settings: { isArchived: false } },
           orderBy: { createdAt: "desc" },
           include: {
+            settings: true,
             affiliateEnrollments: {
               select: { referralCode: true },
             },
           },
         },
+        profile: true,
       },
     });
   }
@@ -95,16 +112,7 @@ export class UserRepository extends BaseRepository {
     id: string,
     data: {
       name?: string;
-      bio?: string;
-      whatsapp?: string;
       avatar?: string;
-      headline?: string;
-      ctaText?: string;
-      sellerTier?: string;
-      subscriptionEnd?: Date | null;
-      customFeeRate?: number | null;
-      customDomain?: string | null;
-      domainVerified?: boolean;
     }
   ): Promise<UserPublic | null> {
     return prisma.user.update({
@@ -172,26 +180,63 @@ export class UserRepository extends BaseRepository {
     };
   }
 
-  async updateTierInfo(userId: string, tier: string, subscriptionEnd: Date | null) {
-    return prisma.user.update({
-      where: { id: userId },
-      data: {
-        sellerTier: tier as Prisma.EnumSellerTierFieldUpdateOperationsInput["set"],
-        subscriptionEnd,
-      },
-      select: SELECT_PUBLIC_FIELDS,
+  // ============ SELLER PROFILE METHODS ============
+
+  async updateSellerProfile(userId: string, data: {
+    bio?: string;
+    headline?: string;
+    ctaText?: string;
+    whatsapp?: string;
+  }) {
+    return prisma.sellerProfile.upsert({
+      where: { userId },
+      create: { userId, ...data },
+      update: data,
     });
   }
 
-  async updateBankInfo(userId: string, bankName: string, bankAccount: string, bankHolder: string) {
-    return prisma.user.update({
-      where: { id: userId },
-      data: {
-        bankName,
-        bankAccount,
-        bankHolder,
+  async updateTierInfo(userId: string, tier: string, subscriptionEnd: Date | null) {
+    return prisma.sellerProfile.upsert({
+      where: { userId },
+      create: {
+        userId,
+        sellerTier: tier as any,
+        subscriptionEnd,
       },
-      select: SELECT_PUBLIC_FIELDS,
+      update: {
+        sellerTier: tier as any,
+        subscriptionEnd,
+      },
+    });
+  }
+
+  async updateBalance(userId: string, balance: number) {
+    return prisma.sellerProfile.update({
+      where: { userId },
+      data: { balance },
+    });
+  }
+
+  async incrementBalance(userId: string, amount: number) {
+    return prisma.sellerProfile.update({
+      where: { userId },
+      data: { balance: { increment: amount } },
+    });
+  }
+
+  // ============ BANK ACCOUNT METHODS ============
+
+  async updateBankInfo(userId: string, bankName: string, bankAccount: string, bankHolder: string) {
+    return prisma.bankAccount.upsert({
+      where: { userId },
+      create: { userId, bankName, bankAccount, bankHolder },
+      update: { bankName, bankAccount, bankHolder },
+    });
+  }
+
+  async getBankInfo(userId: string) {
+    return prisma.bankAccount.findUnique({
+      where: { userId },
     });
   }
 }

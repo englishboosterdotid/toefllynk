@@ -53,9 +53,13 @@ export const cachedUsers = {
           username: true,
           email: true,
           name: true,
-          sellerTier: true,
-          customFeeRate: true,
           createdAt: true,
+          profile: {
+            select: {
+              sellerTier: true,
+              customFeeRate: true,
+            },
+          },
         },
       }),
       ttlMs
@@ -67,14 +71,16 @@ export const cachedUsers = {
     return withCache(cacheKey, () =>
       prisma.user.findMany({
         where: {
-          sellerTier: tier as any,
+          profile: tier ? { sellerTier: tier as any } : undefined,
         },
         select: {
           id: true,
           username: true,
           name: true,
-          sellerTier: true,
           createdAt: true,
+          profile: {
+            select: { sellerTier: true },
+          },
         },
         orderBy: { createdAt: "desc" },
       }),
@@ -90,7 +96,8 @@ export const cachedProducts = {
   async getProductsByUser(userId: string, ttlMs: number = TTL.SHORT) {
     return withCache(`products:user:${userId}`, () =>
       prisma.product.findMany({
-        where: { userId, isArchived: false },
+        where: { userId },
+        include: { settings: { where: { isArchived: false } } },
         orderBy: { createdAt: "desc" },
       }),
       ttlMs
@@ -101,10 +108,13 @@ export const cachedProducts = {
     return withCache(`products:featured:${limit}`, () =>
       prisma.product.findMany({
         where: {
-          isArchived: false,
-          isVisibleOnMicrosite: true,
+          settings: {
+            isArchived: false,
+            isVisibleOnMicrosite: true,
+          },
         },
         include: {
+          settings: true,
           user: {
             select: {
               id: true,
@@ -125,6 +135,7 @@ export const cachedProducts = {
       prisma.product.findUnique({
         where: { id },
         include: {
+          settings: true,
           user: {
             select: {
               id: true,
@@ -222,8 +233,10 @@ export const cachedLeaderboard = {
           id: true,
           username: true,
           name: true,
-          sellerTier: true,
           createdAt: true,
+          profile: {
+            select: { sellerTier: true },
+          },
         },
         orderBy: { createdAt: "desc" },
         take: limit,
@@ -235,13 +248,14 @@ export const cachedLeaderboard = {
   async getTopProducts(limit: number = 20, ttlMs: number = TTL.MEDIUM) {
     return withCache(`${CacheKeys.LEADERBOARD}:products:${limit}`, () =>
       prisma.product.findMany({
-        where: { isArchived: false, isVisibleOnMicrosite: true },
-        select: {
-          id: true,
-          title: true,
-          price: true,
-          promoPrice: true,
-          createdAt: true,
+        where: {
+          settings: {
+            isArchived: false,
+            isVisibleOnMicrosite: true,
+          },
+        },
+        include: {
+          settings: { select: { promoPrice: true } },
           user: {
             select: {
               id: true,

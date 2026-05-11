@@ -13,7 +13,13 @@ export default async function AffiliateEarningsPage() {
     include: {
       order: {
         include: {
-          product: { select: { title: true, price: true, promoPrice: true } },
+          product: {
+            select: {
+              title: true,
+              price: true,
+              settings: { select: { promoPrice: true } },
+            },
+          },
         },
       },
     },
@@ -124,7 +130,7 @@ export default async function AffiliateEarningsPage() {
                     +Rp {conv.commissionAmount.toLocaleString("id-ID")}
                   </p>
                   <p className="text-xs text-slate-400">
-                    dari Rp {(conv.order?.product?.promoPrice || conv.order?.product?.price || 0).toLocaleString("id-ID")}
+                    dari Rp {(conv.order?.product?.settings?.promoPrice || conv.order?.product?.price || 0).toLocaleString("id-ID")}
                   </p>
                 </div>
               </div>

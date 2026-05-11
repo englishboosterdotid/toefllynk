@@ -1,20 +1,16 @@
 export const dynamic = "force-dynamic";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/services/authService";
-import { OrderStatus, PackageType } from "@/generated/prisma/enums";
+import { OrderStatus } from "@/generated/prisma/enums";
 import { OrdersTable } from "./OrdersTable";
 import {
   ShoppingCart,
   CheckCircle2,
   Clock,
   XCircle,
-  CreditCard,
-  TrendingUp,
-  Users,
   DollarSign,
-  BarChart3,
+  TrendingUp,
   Percent,
-  Calculator,
 } from "lucide-react";
 
 export default async function OrdersPage() {
@@ -27,7 +23,9 @@ export default async function OrdersPage() {
       },
     },
     include: {
-      product: true,
+      product: {
+        include: { settings: true },
+      },
       affiliateConversion: true,
       adminFee: true,
       student: {
@@ -47,7 +45,7 @@ export default async function OrdersPage() {
   const completedOrders = orders.filter((o) => o.status === OrderStatus.COMPLETED);
   const cancelledOrders = orders.filter((o) => o.status === OrderStatus.CANCELLED);
   const totalRevenue = completedOrders.reduce(
-    (sum, o) => sum + (o.product?.promoPrice || o.product?.price || 0),
+    (sum, o) => sum + (o.product?.settings?.promoPrice || o.product?.price || 0),
     0
   );
   const totalAffiliateCommission = completedOrders.reduce(
@@ -165,22 +163,22 @@ export default async function OrdersPage() {
           <p className="text-xs text-slate-500 mt-1">Komisi Affiliate</p>
         </div>
 
-        {/* Pending */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        {/* Pending Withdrawal */}
+        <div className="bg-white rounded-2xl border border-amber-200 p-5">
           <div className="flex items-center justify-between mb-3">
-            <div className="bg-red-100 rounded-xl p-2">
-              <Calculator className="h-5 w-5 text-red-600" />
+            <div className="bg-amber-100 rounded-xl p-2">
+              <Clock className="h-5 w-5 text-amber-600" />
             </div>
             {pendingAmount > 0 && (
               <span className="bg-amber-500 text-white text-xs px-2 py-1 rounded-full">
-                {pendingAmount > 0 ? "!" : ""}
+                !
               </span>
             )}
           </div>
           <p className="text-xl font-bold text-slate-900">
-            Rp {totalPlatformFee.toLocaleString("id-ID")}
+            Rp {pendingAmount.toLocaleString("id-ID")}
           </p>
-          <p className="text-xs text-slate-500 mt-1">Platform Fee (5%)</p>
+          <p className="text-xs text-slate-500 mt-1">Pending Withdrawal</p>
         </div>
       </div>
 
@@ -211,20 +209,8 @@ export default async function OrdersPage() {
         </div>
 
         <div className="bg-white rounded-xl border border-slate-100 p-4 flex items-center gap-3">
-          <div className="bg-orange-100 rounded-lg p-2">
-            <Percent className="h-4 w-4 text-orange-600" />
-          </div>
-          <div>
-            <p className="text-lg font-semibold text-slate-900">
-              Rp {totalAffiliateCommission.toLocaleString("id-ID")}
-            </p>
-            <p className="text-xs text-slate-500">Affiliate Commission</p>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-100 p-4 flex items-center gap-3">
           <div className="bg-green-100 rounded-lg p-2">
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <TrendingUp className="h-4 w-4 text-green-600" />
           </div>
           <div>
             <p className="text-lg font-semibold text-slate-900">

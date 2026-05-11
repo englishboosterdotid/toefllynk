@@ -162,7 +162,7 @@ export async function GET(
         footerText: template.footerText,
         fontFamily: template.fontFamily,
         backgroundImage: template.backgroundImage,
-        validityDays: (template as any).validityDays ?? null,
+        validityDays: template.validityDays ?? 365,
       };
 
       // Fetch custom background image if exists

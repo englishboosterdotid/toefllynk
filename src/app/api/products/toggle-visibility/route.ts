@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/requireUser";
-import { setMicrositeVisibility } from "@/lib/services/productService";
+import { ProductService } from "@/lib/services/ProductService";
 import { headers } from "next/headers";
 
 export async function POST(req: Request) {
@@ -14,7 +14,12 @@ export async function POST(req: Request) {
       return NextResponse.redirect(new URL("/user/products?error=product_required", req.url));
     }
 
-    await setMicrositeVisibility(productId, user.id, visible);
+    const result = await ProductService.toggleMicrositeVisibility(productId, user.id, visible);
+
+    // Check if limit exceeded
+    if (!result.success) {
+      return NextResponse.redirect(new URL(`/user/products?error=max_microsite&message=${encodeURIComponent(result.message || "Batas tercapai")}`, req.url));
+    }
 
     // Redirect back to products page
     const headersList = await headers();

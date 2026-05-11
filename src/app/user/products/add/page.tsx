@@ -11,99 +11,28 @@ import { Label } from "@/components/ui/label";
 import { AnimatedContainer } from "@/components/animations";
 import { cn } from "@/lib/utils";
 
-const MIN_PRICE = 1000; // Minimum price Rp 1,000
-
-type PackagePreset = "BASIC" | "STANDARD" | "PREMIUM" | "COMPREHENSIVE";
-
-const packagePresets: { type: PackagePreset; label: string; description: string; credits: number; price: string; promoPrice: string; features: string[] }[] = [
-  {
-    type: "BASIC",
-    label: "Basic",
-    description: "Untuk pemula",
-    credits: 1,
-    price: "29000",
-    promoPrice: "19000",
-    features: ["1 TOEFL Credit", "Score Certificate", "Basic Support"],
-  },
-  {
-    type: "STANDARD",
-    label: "Standard",
-    description: "Paling populer",
-    credits: 3,
-    price: "69000",
-    promoPrice: "49000",
-    features: ["3 TOEFL Credits", "Score Certificate", "Basic Support"],
-  },
-  {
-    type: "PREMIUM",
-    label: "Premium",
-    description: "Latihan intensif",
-    credits: 5,
-    price: "119000",
-    promoPrice: "89000",
-    features: ["5 TOEFL Credits", "Score Certificate", "Answer Review", "Priority Support"],
-  },
-  {
-    type: "COMPREHENSIVE",
-    label: "Comprehensive",
-    description: "Full package",
-    credits: 10,
-    price: "199000",
-    promoPrice: "149000",
-    features: ["10 TOEFL Credits", "Score Certificate", "Answer Review", "Zoom Mentoring", "Priority Support"],
-  },
-];
-
-// Minimum price per credit based on package features
-const getMinPricePerCredit = (form: typeof initialForm) => {
-  let minPrice = 15000; // Base price per credit
-
-  // Add extra for review
-  if (form.reviewIncluded === true) {
-    minPrice += 5000;
-  }
-
-  // Add extra for zoom
-  if (form.zoomIncluded === true) {
-    minPrice += 30000;
-  }
-
-  return minPrice;
-};
-
-// Suggested price ranges based on package type
-const getSuggestedPriceRange = (form: typeof initialForm) => {
-  const credits = Number(form.examCredits) || 1;
-  const minPerCredit = getMinPricePerCredit(form);
-
-  const minTotal = credits * minPerCredit;
-  const recommended = credits * (minPerCredit + 10000); // Add buffer for profit
-  const maxSuggested = credits * (minPerCredit + 25000); // Reasonable max
-
-  return {
-    min: minTotal,
-    recommended: recommended,
-    max: maxSuggested,
-  };
-};
-
 const productCategories = [
   { value: "", label: "Pilih kategori..." },
   { value: "TOEFL", label: "TOEFL Simulation" },
   { value: "IELTS", label: "IELTS Simulation" },
-  { value: "TOEFL + IELTS", label: "TOEFL + IELTS" },
-  { value: "Full Package", label: "Full Package" },
-  { value: "Bundle", label: "Bundle" },
-  { value: "Mentoring", label: "Mentoring" },
-  { value: "Lainnya", label: "Lainnya" },
+];
+
+// Package presets with tiered pricing
+type PackagePresetType = "BASIC" | "STANDARD" | "PREMIUM" | "COMPREHENSIVE";
+
+const packagePresets: { type: PackagePresetType; label: string; credits: number; price: number; promoPrice: number; minPrice: number; minPromoPrice: number }[] = [
+  { type: "BASIC", label: "Basic", credits: 1, price: 29000, promoPrice: 19000, minPrice: 19000, minPromoPrice: 15000 },
+  { type: "STANDARD", label: "Standard", credits: 3, price: 69000, promoPrice: 49000, minPrice: 56000, minPromoPrice: 40000 },
+  { type: "PREMIUM", label: "Premium", credits: 5, price: 119000, promoPrice: 89000, minPrice: 90000, minPromoPrice: 60000 },
+  { type: "COMPREHENSIVE", label: "Comprehensive", credits: 10, price: 199000, promoPrice: 149000, minPrice: 175000, minPromoPrice: 120000 },
 ];
 
 const initialForm = {
   title: "",
   description: "",
   productType: "TOEFL_SIMULATION",
-  price: "29000",
-  promoPrice: "19000",
+  price: "",
+  promoPrice: "",
   thumbnail: "",
   category: "",
   packageType: "INDIVIDUAL",
@@ -119,39 +48,39 @@ export default function AddProductPage() {
   const router = useRouter();
   const { uploadFile } = useFileUpload();
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedPreset, setSelectedPreset] = useState<PackagePreset | null>(null);
+  const [selectedPreset, setSelectedPreset] = useState<PackagePresetType | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [warnings, setWarnings] = useState<Record<string, string>>({});
 
   const [form, setForm] = useState(initialForm);
 
-  // Calculate suggested price range
-  const priceRange = getSuggestedPriceRange(form);
+  // Calculate floor prices based on credits
+  const getFloorPrices = (credits: number) => {
+    return {
+      minPrice: credits * 19000,
+      minPromoPrice: credits * 15000,
+    };
+  };
 
-  const applyPackagePreset = (type: PackagePreset) => {
-    const preset = packagePresets.find((p) => p.type === type);
-    if (!preset) return;
-
-    setSelectedPreset(type);
-    setErrors({}); // Clear errors when selecting preset
-    setWarnings({}); // Clear warnings when selecting preset
-    handleFormChange({
+  // Apply preset
+  const applyPreset = (preset: typeof packagePresets[0]) => {
+    setSelectedPreset(preset.type);
+    setErrors({});
+    setWarnings({});
+    setForm({
       ...form,
       examCredits: String(preset.credits),
+      price: String(preset.price),
+      promoPrice: String(preset.promoPrice),
       certificateIncluded: true,
-      // Only lock credits and certificate, not review and zoom
-      price: preset.price,
-      promoPrice: preset.promoPrice,
-      commissionPercent: preset.type === "BASIC" ? "10" : preset.type === "STANDARD" ? "12" : preset.type === "PREMIUM" ? "15" : "20",
     });
   };
 
-  // Clear errors when any field changes
+  // Handle form changes and clear preset when user manually changes values
   const handleFormChange = (updatedForm: typeof form) => {
-    // Clear all errors when user changes any field
+    setForm(updatedForm);
     setErrors({});
     setWarnings({});
-    setForm(updatedForm);
   };
 
   // Simple validation for submit - only check required fields
@@ -169,40 +98,26 @@ export default function AddProductPage() {
 
     const price = Number(form.price);
     const promoPrice = Number(form.promoPrice);
+    const MIN_PRICE_PER_CREDIT = 15000;
 
-    // Get preset minimum if selected
-    const preset = selectedPreset ? packagePresets.find((p) => p.type === selectedPreset) : null;
-    const presetMinPrice = preset ? Number(preset.promoPrice) : 0;
-
-    // Validate price based on credits
+    // Validate regular price - minimum 15000 per credit
     if (price && examCredits) {
-      const minPerCredit = getMinPricePerCredit(form);
-      const minTotal = examCredits * minPerCredit;
-      if (price < minTotal) {
-        newErrors.price = `Harga terlalu rendah untuk ${examCredits} credit${form.reviewIncluded ? " + review" : ""}${form.zoomIncluded ? " + zoom" : ""}. Min: Rp ${minTotal.toLocaleString("id-ID")}`;
+      const minPrice = examCredits * MIN_PRICE_PER_CREDIT;
+      if (price < minPrice) {
+        newErrors.price = `Harga terlalu rendah. Minimal Rp ${minPrice.toLocaleString("id-ID")} untuk ${examCredits} credit`;
       }
     }
 
-    // Price cannot be less than preset minimum if preset selected
-    if (preset && price < presetMinPrice) {
-      newErrors.price = `Harga tidak boleh kurang dari Rp ${presetMinPrice.toLocaleString("id-ID")} (minimal preset)`;
-    }
-
-    // Promo price validation
-    if (promoPrice > 0 && preset) {
-      // Promo cannot be less than preset minimum
-      if (promoPrice < presetMinPrice) {
-        newErrors.promoPrice = `Harga promo minimal Rp ${presetMinPrice.toLocaleString("id-ID")} (sesuai preset)`;
+    // Validate promo price - minimum 15000 per credit
+    if (promoPrice > 0) {
+      const minPromoPrice = examCredits * MIN_PRICE_PER_CREDIT;
+      if (promoPrice < minPromoPrice) {
+        newErrors.promoPrice = `Harga promo terlalu rendah. Minimal Rp ${minPromoPrice.toLocaleString("id-ID")} untuk ${examCredits} credit`;
       }
       // Promo cannot be higher than regular price
-      if (promoPrice > price) {
+      else if (price && promoPrice > price) {
         newErrors.promoPrice = "Harga promo tidak boleh lebih tinggi dari harga normal";
       }
-    }
-
-    // If promo is empty and preset selected, price must be >= preset minimum
-    if (!promoPrice && preset && price < presetMinPrice) {
-      newErrors.price = `Harga minimal Rp ${presetMinPrice.toLocaleString("id-ID")} (sesuai preset)`;
     }
 
     return newErrors;
@@ -347,8 +262,8 @@ export default function AddProductPage() {
                     id="productType"
                     value={form.productType}
                     onChange={(e) => {
-                      setSelectedPreset(null);
                       setForm((prev) => ({ ...prev, productType: e.target.value }));
+                      setWarnings({});
                     }}
                     className="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm transition-all focus-visible:border-blue-500 focus-visible:outline-none"
                   >
@@ -362,39 +277,75 @@ export default function AddProductPage() {
                     <select
                       id="packageType"
                       value={form.packageType}
-                      onChange={(e) => setForm((prev) => ({ ...prev, packageType: e.target.value }))}
+                      onChange={(e) => handleFormChange({ ...form, packageType: e.target.value })}
                       className="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm"
                     >
                       <option value="INDIVIDUAL">Individual Package</option>
-                      <option value="BUNDLE">Bundle Package</option>
                     </select>
                   </div>
                 )}
               </div>
 
               {form.productType === "TOEFL_SIMULATION" && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="space-y-6">
+                  {/* Package Presets */}
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-100">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h4 className="font-semibold text-slate-900">Quick Select Package</h4>
+                        <p className="text-xs text-slate-500 mt-1">Pilih paket preset untuk otomatis isi harga</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {packagePresets.map((preset) => {
+                        const isSelected = selectedPreset === preset.type;
+                        const floorPrices = getFloorPrices(preset.credits);
+                        return (
+                          <button
+                            key={preset.type}
+                            type="button"
+                            onClick={() => applyPreset(preset)}
+                            className={cn(
+                              "p-4 rounded-xl border-2 transition-all text-left",
+                              isSelected
+                                ? "border-blue-500 bg-white shadow-md ring-2 ring-blue-200"
+                                : "border-transparent bg-white/70 hover:border-blue-200 hover:bg-white"
+                            )}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-bold text-slate-900">{preset.label}</span>
+                              {isSelected && (
+                                <Check className="h-4 w-4 text-blue-500" />
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500 mb-1">{preset.credits} Credit</p>
+                            <p className="text-lg font-bold text-blue-600">
+                              Rp {preset.promoPrice.toLocaleString("id-ID")}
+                            </p>
+                            <p className="text-xs text-slate-400 line-through">
+                              Rp {preset.price.toLocaleString("id-ID")}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Manual Input Fields */}
                   <div className="space-y-2">
                     <Label htmlFor="examCredits" className="flex items-center gap-1">
                       Jumlah Credit *
-                      {selectedPreset && (
-                        <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">Preset</span>
-                      )}
                     </Label>
                     <Input
                       id="examCredits"
                       type="number"
                       min="1"
                       value={form.examCredits}
-                      readOnly={!!selectedPreset}
                       onChange={(e) => {
-                        if (!selectedPreset) {
-                          handleFormChange({ ...form, examCredits: e.target.value });
-                        }
+                        handleFormChange({ ...form, examCredits: e.target.value });
                       }}
                       className={cn(
-                        errors.examCredits ? "border-red-500 focus:border-red-500" : "",
-                        selectedPreset && "bg-slate-100 cursor-not-allowed"
+                        errors.examCredits ? "border-red-500 focus:border-red-500" : ""
                       )}
                     />
                     {errors.examCredits && (
@@ -407,19 +358,12 @@ export default function AddProductPage() {
                   <div className="space-y-2">
                     <Label htmlFor="certificateIncluded" className="flex items-center gap-1">
                       Sertifikat
-                      {selectedPreset && (
-                        <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">Preset</span>
-                      )}
                     </Label>
                     <select
                       id="certificateIncluded"
                       value={String(form.certificateIncluded)}
-                      disabled={!!selectedPreset}
-                      onChange={(e) => setForm({ ...form, certificateIncluded: e.target.value === "true" })}
-                      className={cn(
-                        "w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm",
-                        selectedPreset && "bg-slate-100 cursor-not-allowed"
-                      )}
+                      onChange={(e) => handleFormChange({ ...form, certificateIncluded: e.target.value === "true" })}
+                      className="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm"
                     >
                       <option value="true">Ya, Included</option>
                       <option value="false">Tidak</option>
@@ -430,7 +374,7 @@ export default function AddProductPage() {
                     <select
                       id="reviewIncluded"
                       value={String(form.reviewIncluded)}
-                      onChange={(e) => setForm({ ...form, reviewIncluded: e.target.value === "true" })}
+                      onChange={(e) => handleFormChange({ ...form, reviewIncluded: e.target.value === "true" })}
                       className="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm"
                     >
                       <option value="true">Ya, Included</option>
@@ -442,7 +386,7 @@ export default function AddProductPage() {
                     <select
                       id="zoomIncluded"
                       value={String(form.zoomIncluded)}
-                      onChange={(e) => setForm({ ...form, zoomIncluded: e.target.value === "true" })}
+                      onChange={(e) => handleFormChange({ ...form, zoomIncluded: e.target.value === "true" })}
                       className="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm"
                     >
                       <option value="false">Tidak</option>
@@ -452,52 +396,6 @@ export default function AddProductPage() {
                 </div>
               )}
             </div>
-
-            {/* Package Presets - Only for TOEFL/IELTS Simulation */}
-            {["TOEFL_SIMULATION", "IELTS_SIMULATION"].includes(form.productType) && form.packageType !== "BUNDLE" && (
-              <>
-                {/* Divider */}
-                <div className="border-t border-slate-100" />
-
-                {/* Section: Package Presets */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Pilih Package Preset</h3>
-                  <p className="text-xs text-slate-500 -mt-2">Pilih preset untuk mengisi harga otomatis, atau atur manual</p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {packagePresets.map((preset) => (
-                      <button
-                        key={preset.type}
-                        type="button"
-                        onClick={() => applyPackagePreset(preset.type)}
-                        className={cn(
-                          "relative p-4 rounded-xl border-2 transition-all text-left",
-                          selectedPreset === preset.type
-                            ? "border-blue-500 bg-blue-50"
-                            : "border-slate-200 hover:border-blue-300 hover:bg-slate-50"
-                        )}
-                      >
-                        {selectedPreset === preset.type && (
-                          <div className="absolute -top-2 -right-2 h-5 w-5 bg-blue-500 rounded-full flex items-center justify-center">
-                            <Check className="h-3 w-3 text-white" />
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm font-semibold text-slate-900">{preset.label}</span>
-                          <span className="text-xs text-slate-500">{preset.credits}x</span>
-                        </div>
-                        <p className="text-xs text-slate-500 mb-2">{preset.description}</p>
-                        <div className="text-base font-bold text-slate-900">
-                          Rp {Number(preset.promoPrice).toLocaleString("id-ID")}
-                        </div>
-                        <div className="text-xs text-slate-400 line-through">
-                          Rp {Number(preset.price).toLocaleString("id-ID")}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
 
             {/* Divider */}
             <div className="border-t border-slate-100" />
@@ -509,18 +407,15 @@ export default function AddProductPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="price">Harga (Rp) *</Label>
-                    {!selectedPreset && (
-                      <span className="text-xs text-slate-500">
-                        Range: Rp {priceRange.min.toLocaleString("id-ID")} - {priceRange.max.toLocaleString("id-ID")}
-                      </span>
-                    )}
+                    <span className="text-xs text-slate-500">
+                      Min: Rp {(Number(form.examCredits) * 15000).toLocaleString("id-ID")}
+                    </span>
                   </div>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">Rp</span>
                     <Input
                       id="price"
                       type="number"
-                      min={MIN_PRICE}
                       placeholder="29000"
                       value={form.price}
                       onChange={(e) => {
@@ -549,31 +444,17 @@ export default function AddProductPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="promoPrice">Harga Promo (Rp)</Label>
-                  {selectedPreset && (
-                    <span className="text-xs text-slate-500">
-                      Min: Rp {Number(packagePresets.find((p) => p.type === selectedPreset)?.promoPrice || 0).toLocaleString("id-ID")}
-                    </span>
-                  )}
+                  <span className="text-xs text-slate-500">
+                    Min: Rp {(Number(form.examCredits) * 15000).toLocaleString("id-ID")}
+                  </span>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">Rp</span>
                     <Input
                       id="promoPrice"
                       type="number"
-                      min={MIN_PRICE}
                       placeholder="19000"
                       value={form.promoPrice}
-                      onChange={(e) => {
-                        const newValue = e.target.value;
-                        setForm({ ...form, promoPrice: newValue });
-                        // Clear error if value is now valid or empty
-                        if (errors.promoPrice && (!newValue || !selectedPreset)) {
-                          setErrors((prev) => {
-                            const newErrors = { ...prev };
-                            delete newErrors.promoPrice;
-                            return newErrors;
-                          });
-                        }
-                      }}
+                      onChange={(e) => handleFormChange({ ...form, promoPrice: e.target.value })}
                       className={cn(
                         "pl-12",
                         errors.promoPrice && "border-red-500 focus:border-red-500",
@@ -652,7 +533,7 @@ export default function AddProductPage() {
                 <input
                   type="checkbox"
                   checked={form.affiliateEnabled}
-                  onChange={(e) => setForm({ ...form, affiliateEnabled: e.target.checked })}
+                  onChange={(e) => handleFormChange({ ...form, affiliateEnabled: e.target.checked })}
                   className="h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                 />
                 <div>
@@ -672,7 +553,7 @@ export default function AddProductPage() {
                       max="100"
                       placeholder="10"
                       value={form.commissionPercent}
-                      onChange={(e) => setForm({ ...form, commissionPercent: e.target.value })}
+                      onChange={(e) => handleFormChange({ ...form, commissionPercent: e.target.value })}
                     />
                   </div>
                   <span className="text-sm text-slate-500 mt-6">dari harga promo</span>
@@ -690,23 +571,6 @@ export default function AddProductPage() {
                 <div>
                   <p className="text-slate-400 text-sm">Harga Normal</p>
                   <p className="text-2xl font-bold">Rp {Number(form.price || 0).toLocaleString("id-ID")}</p>
-                  {!selectedPreset && !errors.price && form.price && (
-                    <p className={cn(
-                      "text-xs mt-1",
-                      Number(form.price) >= priceRange.min && Number(form.price) <= priceRange.max
-                        ? "text-green-400"
-                        : Number(form.price) < priceRange.min
-                          ? "text-amber-400"
-                          : "text-slate-400"
-                    )}>
-                      {Number(form.price) < priceRange.min
-                        ? `Below min (min Rp ${priceRange.min.toLocaleString("id-ID")})`
-                        : Number(form.price) > priceRange.max
-                          ? `Above max (max Rp ${priceRange.max.toLocaleString("id-ID")})`
-                          : "Within range"
-                      }
-                    </p>
-                  )}
                 </div>
                 <div>
                   <p className="text-slate-400 text-sm">Harga Promo</p>

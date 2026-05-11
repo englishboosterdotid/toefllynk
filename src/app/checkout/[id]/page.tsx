@@ -16,6 +16,7 @@ export default async function CheckoutPage({
     where: { id },
     include: {
       user: true,
+      settings: true,
     },
   });
 
@@ -27,18 +28,18 @@ export default async function CheckoutPage({
     title: product.title,
     description: product.description,
     price: product.price,
-    promoPrice: product.promoPrice,
+    promoPrice: product.settings?.promoPrice ?? null,
     thumbnail: product.thumbnail,
-    examCredits: product.examCredits,
-    certificateIncluded: product.certificateIncluded,
-    reviewIncluded: product.reviewIncluded,
-    zoomIncluded: product.zoomIncluded,
-    packageType: product.packageType,
+    examCredits: product.settings?.examCredits ?? 1,
+    certificateIncluded: product.settings?.certificateIncluded ?? true,
+    reviewIncluded: product.settings?.reviewIncluded ?? false,
+    zoomIncluded: product.settings?.zoomIncluded ?? false,
+    packageType: product.settings?.packageType ?? null,
     user: {
       name: product.user.name,
       username: product.user.username,
     },
-    isArchived: product.isArchived,
+    isArchived: product.settings?.isArchived ?? false,
   };
 
   return (

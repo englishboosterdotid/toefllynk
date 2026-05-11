@@ -1,12 +1,13 @@
 /**
  * Seller Tier Middleware
  * Checks if user meets minimum tier requirements
+ * Uses normalized SellerProfile pattern
  */
 
 import { getSession } from "@/lib/session";
 import prisma from "@/lib/prisma";
 import { SellerTier } from "@/generated/prisma/enums";
-import { TierService, TierServiceClass, TIER_ORDER } from "@/lib/services/TierService";
+import { TierServiceClass, TIER_ORDER } from "@/lib/services/TierService";
 
 export interface TierCheckResult {
   success: boolean;
@@ -28,56 +29,52 @@ export async function requireTier(
     throw new Error("Unauthorized");
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
+  // Get tier info from SellerProfile
+  const profile = await prisma.sellerProfile.findUnique({
+    where: { userId: session.userId },
     select: {
       sellerTier: true,
       subscriptionEnd: true,
     },
   });
 
-  if (!user) {
-    throw new Error("User not found");
-  }
+  const sellerTier = profile?.sellerTier || "FREE";
 
   // Check if user meets minimum tier
-  if (!TierServiceClass.isHigherOrEqual(user.sellerTier, minTier)) {
-    const currentRank = TierServiceClass.getRank(user.sellerTier);
+  if (!TierServiceClass.isHigherOrEqual(sellerTier, minTier)) {
+    const currentRank = TierServiceClass.getRank(sellerTier);
     const nextTier = TIER_ORDER[currentRank + 1];
 
     throw new Error(`TIER_REQUIRED:${minTier}:${nextTier || ""}`);
   }
 
   // Check subscription validity (if enabled)
-  if (options?.checkSubscription && user.sellerTier !== "FREE") {
-    const isValid = TierServiceClass.isSubscriptionValid(user.subscriptionEnd, user.sellerTier);
+  if (options?.checkSubscription && sellerTier !== "FREE") {
+    const isValid = TierServiceClass.isSubscriptionValid(profile?.subscriptionEnd ?? null, sellerTier);
 
     if (!isValid) {
       throw new Error("SUBSCRIPTION_EXPIRED");
     }
   }
 
-  return { userId: session.userId, tier: user.sellerTier };
+  return { userId: session.userId, tier: sellerTier };
 }
 
 export async function checkTierAccess(
   userId: string,
   minTier: SellerTier
 ): Promise<TierCheckResult> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
+  const profile = await prisma.sellerProfile.findUnique({
+    where: { userId },
     select: { sellerTier: true },
   });
 
-  if (!user) {
-    return { success: false, error: "User not found" };
-  }
-
-  const hasAccess = TierServiceClass.isHigherOrEqual(user.sellerTier, minTier);
+  const sellerTier = profile?.sellerTier || "FREE";
+  const hasAccess = TierServiceClass.isHigherOrEqual(sellerTier, minTier);
 
   return {
     success: hasAccess,
-    currentTier: user.sellerTier,
+    currentTier: sellerTier,
     requiredTier: minTier,
     error: hasAccess ? undefined : `Requires ${minTier} tier`,
   };
@@ -105,19 +102,17 @@ export async function requireActiveSeller(userId: string): Promise<{
   tier?: SellerTier;
   error?: string;
 }> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
+  const profile = await prisma.sellerProfile.findUnique({
+    where: { userId },
     select: {
       sellerTier: true,
       subscriptionEnd: true,
     },
   });
 
-  if (!user) {
-    return { success: false, error: "User not found" };
-  }
+  const sellerTier = profile?.sellerTier || "FREE";
 
-  if (user.sellerTier === "FREE") {
+  if (sellerTier === "FREE") {
     return {
       success: false,
       error: "Upgrade ke PRO atau BUSINESS untuk mengakses fitur ini",
@@ -125,7 +120,7 @@ export async function requireActiveSeller(userId: string): Promise<{
   }
 
   // Check subscription validity for non-FREE tiers
-  const isValid = TierServiceClass.isSubscriptionValid(user.subscriptionEnd, user.sellerTier);
+  const isValid = TierServiceClass.isSubscriptionValid(profile?.subscriptionEnd ?? null, sellerTier);
   if (!isValid) {
     return {
       success: false,
@@ -133,5 +128,5 @@ export async function requireActiveSeller(userId: string): Promise<{
     };
   }
 
-  return { success: true, tier: user.sellerTier };
+  return { success: true, tier: sellerTier };
 }

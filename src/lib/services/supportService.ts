@@ -62,7 +62,7 @@ export async function createTicket(
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { sellerTier: true },
+      select: { profile: { select: { sellerTier: true } } },
     });
 
     if (!user) {
@@ -197,7 +197,7 @@ export async function getSupportTierInfo(userId: string): Promise<{
 }> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { sellerTier: true },
+    select: { profile: { select: { sellerTier: true } } },
   });
 
   if (!user) {
@@ -208,7 +208,7 @@ export async function getSupportTierInfo(userId: string): Promise<{
     };
   }
 
-  const tierConfig = TierServiceClass.getConfig(user.sellerTier);
+  const tierConfig = TierServiceClass.getConfig(user.profile?.sellerTier || "FREE");
 
   return {
     supportLevel: tierConfig.supportLevel,
@@ -217,6 +217,6 @@ export async function getSupportTierInfo(userId: string): Promise<{
       : tierConfig.supportLevel === "email"
         ? "2-3 business days"
         : "Community forum",
-    canCreateTicket: user.sellerTier !== "FREE" || true, // Everyone can create tickets, but FREE gets community support only
+    canCreateTicket: user.profile?.sellerTier !== "FREE" || true, // Everyone can create tickets, but FREE gets community support only
   };
 }

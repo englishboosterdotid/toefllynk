@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { User, MessageCircle, Image, Type, CheckCircle2 } from "lucide-react";
+import { User, MessageCircle, Image, Type, CheckCircle2, Link2, Mail, MapPin } from "lucide-react";
 import { AnimatedContainer } from "@/components/animations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function MicrositePage() {
   const [form, setForm] = useState({
@@ -15,6 +16,17 @@ export default function MicrositePage() {
     whatsapp: "",
     avatar: "",
     ctaText: "",
+    // Social Links
+    socialInstagram: "",
+    socialFacebook: "",
+    socialTwitter: "",
+    socialYoutube: "",
+    socialTiktok: "",
+    socialLinkedin: "",
+    // Contact Info
+    contactEmail: "",
+    contactPhone: "",
+    contactAddress: "",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -24,23 +36,39 @@ export default function MicrositePage() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("success") === "1") {
       setSuccess(true);
-      // Remove param from URL
       window.history.replaceState({}, "", "/user/microsite");
     }
 
-    fetch("/api/me")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.user) {
-          setForm({
-            headline: data.user.headline || "",
-            bio: data.user.bio || "",
-            whatsapp: data.user.whatsapp || "",
-            avatar: data.user.avatar || "",
-            ctaText: data.user.ctaText || "",
-          });
-        }
-      });
+    // Fetch user and microsite settings
+    Promise.all([
+      fetch("/api/me").then((res) => res.json()),
+      fetch("/api/user/microsite-settings").then((res) => res.json()),
+    ]).then(([userData, settingsData]) => {
+      if (userData.user) {
+        setForm((prev) => ({
+          ...prev,
+          headline: userData.user.headline || "",
+          bio: userData.user.bio || "",
+          whatsapp: userData.user.whatsapp || "",
+          avatar: userData.user.avatar || "",
+          ctaText: userData.user.ctaText || "",
+        }));
+      }
+      if (settingsData.settings) {
+        setForm((prev) => ({
+          ...prev,
+          socialInstagram: settingsData.settings.socialInstagram || "",
+          socialFacebook: settingsData.settings.socialFacebook || "",
+          socialTwitter: settingsData.settings.socialTwitter || "",
+          socialYoutube: settingsData.settings.socialYoutube || "",
+          socialTiktok: settingsData.settings.socialTiktok || "",
+          socialLinkedin: settingsData.settings.socialLinkedin || "",
+          contactEmail: settingsData.settings.contactEmail || "",
+          contactPhone: settingsData.settings.contactPhone || "",
+          contactAddress: settingsData.settings.contactAddress || "",
+        }));
+      }
+    });
   }, []);
 
   const uploadFile = async (file: File) => {
@@ -89,19 +117,37 @@ export default function MicrositePage() {
     setIsLoading(true);
 
     try {
-      const fd = new FormData();
-      fd.append("headline", form.headline);
-      fd.append("bio", form.bio);
-      fd.append("whatsapp", form.whatsapp);
-      fd.append("avatar", form.avatar);
-      fd.append("ctaText", form.ctaText);
+      // Save profile settings
+      const profileFd = new FormData();
+      profileFd.append("headline", form.headline);
+      profileFd.append("bio", form.bio);
+      profileFd.append("whatsapp", form.whatsapp);
+      profileFd.append("avatar", form.avatar);
+      profileFd.append("ctaText", form.ctaText);
 
-      const res = await fetch("/api/microsite", {
+      const profileRes = await fetch("/api/microsite", {
         method: "POST",
-        body: fd,
+        body: profileFd,
       });
 
-      if (res.ok) {
+      // Save microsite settings (social + contact)
+      const settingsRes = await fetch("/api/user/microsite-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          socialInstagram: form.socialInstagram,
+          socialFacebook: form.socialFacebook,
+          socialTwitter: form.socialTwitter,
+          socialYoutube: form.socialYoutube,
+          socialTiktok: form.socialTiktok,
+          socialLinkedin: form.socialLinkedin,
+          contactEmail: form.contactEmail,
+          contactPhone: form.contactPhone,
+          contactAddress: form.contactAddress,
+        }),
+      });
+
+      if (profileRes.ok && settingsRes.ok) {
         setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
       }
@@ -208,6 +254,102 @@ export default function MicrositePage() {
                   placeholder="Hubungi Saya"
                   value={form.ctaText}
                   onChange={(e) => setForm({ ...form, ctaText: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <h2 className="text-lg font-semibold text-slate-900 pt-4 border-t">Link Sosial Media</h2>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="socialInstagram">Instagram</Label>
+                  <Input
+                    id="socialInstagram"
+                    placeholder="@username"
+                    value={form.socialInstagram}
+                    onChange={(e) => setForm({ ...form, socialInstagram: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="socialFacebook">Facebook</Label>
+                  <Input
+                    id="socialFacebook"
+                    placeholder="facebook.com/page"
+                    value={form.socialFacebook}
+                    onChange={(e) => setForm({ ...form, socialFacebook: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="socialTwitter">Twitter/X</Label>
+                  <Input
+                    id="socialTwitter"
+                    placeholder="@username"
+                    value={form.socialTwitter}
+                    onChange={(e) => setForm({ ...form, socialTwitter: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="socialYoutube">YouTube</Label>
+                  <Input
+                    id="socialYoutube"
+                    placeholder="youtube.com/channel"
+                    value={form.socialYoutube}
+                    onChange={(e) => setForm({ ...form, socialYoutube: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="socialTiktok">TikTok</Label>
+                  <Input
+                    id="socialTiktok"
+                    placeholder="@username"
+                    value={form.socialTiktok}
+                    onChange={(e) => setForm({ ...form, socialTiktok: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="socialLinkedin">LinkedIn</Label>
+                  <Input
+                    id="socialLinkedin"
+                    placeholder="linkedin.com/in/username"
+                    value={form.socialLinkedin}
+                    onChange={(e) => setForm({ ...form, socialLinkedin: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <h2 className="text-lg font-semibold text-slate-900 pt-4 border-t">Informasi Kontak</h2>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="contactEmail">Email</Label>
+                  <Input
+                    id="contactEmail"
+                    type="email"
+                    placeholder="contact@example.com"
+                    value={form.contactEmail}
+                    onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="contactPhone">WhatsApp/Telepon</Label>
+                  <Input
+                    id="contactPhone"
+                    placeholder="+6281234567890"
+                    value={form.contactPhone}
+                    onChange={(e) => setForm({ ...form, contactPhone: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contactAddress">Alamat</Label>
+                <Textarea
+                  id="contactAddress"
+                  placeholder="Jl. Contoh No. 123, Jakarta"
+                  rows={2}
+                  className="resize-none"
+                  value={form.contactAddress}
+                  onChange={(e) => setForm({ ...form, contactAddress: e.target.value })}
                 />
               </div>
             </div>

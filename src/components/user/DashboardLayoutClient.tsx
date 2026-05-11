@@ -57,6 +57,14 @@ const navigationGroups: NavGroup[] = [
     ],
   },
   {
+    title: "Promote & Affiliate",
+    items: [
+      { label: "Affiliate Marketplace", href: "/user/affiliate-marketplace", icon: Store },
+      { label: "My Affiliate Links", href: "/user/my-affiliate-links", icon: Link2 },
+      { label: "Affiliate Earnings", href: "/user/affiliate-earnings", icon: DollarSign },
+    ],
+  },
+  {
     title: "Marketing & Sales",
     items: [
       { label: "Promo Codes", href: "/user/promo-codes", icon: Tag, requiredTier: "PRO", badge: "PRO" },
@@ -85,14 +93,6 @@ const navigationGroups: NavGroup[] = [
     items: [
       { label: "Upgrade Plan", href: "/user/subscription", icon: Crown },
       { label: "Withdrawals", href: "/user/withdrawal", icon: Wallet },
-    ],
-  },
-  {
-    title: "Promote & Affiliate",
-    items: [
-      { label: "Affiliate Marketplace", href: "/user/affiliate-marketplace", icon: Store },
-      { label: "My Affiliate Links", href: "/user/my-affiliate-links", icon: Link2 },
-      { label: "Affiliate Earnings", href: "/user/affiliate-earnings", icon: DollarSign },
     ],
   },
 ];

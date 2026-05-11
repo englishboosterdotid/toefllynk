@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/requireUser";
-import { createProduct } from "@/lib/services/productService";
+import { ProductService } from "@/lib/services/ProductService";
 import { ProductType, PackageType } from "@/generated/prisma/enums";
 import { cache, CacheKeys } from "@/lib/cache";
 
@@ -16,24 +16,29 @@ export async function POST(req: Request) {
     const reviewIncluded = formData.get("reviewIncluded");
     const zoomIncluded = formData.get("zoomIncluded");
     const affiliateEnabled = formData.get("affiliateEnabled");
+    const affiliateCommissionRaw = formData.get("commissionPercent");
+    const affiliateCommission = affiliateCommissionRaw ? Number(affiliateCommissionRaw) : 10;
 
-    await createProduct({
+    await ProductService.createProduct({
       userId: user.id,
       title: formData.get("title") as string,
       description: formData.get("description") as string,
-      packageType: packageTypeValue as PackageType,
-      productType: productTypeValue as ProductType,
-      examCredits: Number(formData.get("examCredits")) || 1,
       price: Number(formData.get("price")),
-      promoPrice: Number(formData.get("promoPrice")) || null,
       thumbnail: formData.get("thumbnail") as string,
       category: categoryValue || null,
-      certificateIncluded: certificateIncluded === "true" || certificateIncluded === "on",
-      reviewIncluded: reviewIncluded === "true" || reviewIncluded === "on",
-      zoomIncluded: zoomIncluded === "true" || zoomIncluded === "on",
-      affiliateEnabled: affiliateEnabled === "true" || affiliateEnabled === "on",
+      productType: productTypeValue as ProductType,
+      settings: {
+        packageType: packageTypeValue as PackageType,
+        examCredits: Number(formData.get("examCredits")) || 1,
+        promoPrice: Number(formData.get("promoPrice")) || null,
+        certificateIncluded: certificateIncluded === "true" || certificateIncluded === "on",
+        reviewIncluded: reviewIncluded === "true" || reviewIncluded === "on",
+        zoomIncluded: zoomIncluded === "true" || zoomIncluded === "on",
+        affiliateEnabled: affiliateEnabled === "true" || affiliateEnabled === "on",
+        affiliateCommission: affiliateCommission,
+      },
     });
-    
+
     // Invalidate products cache
     cache.delete(CacheKeys.PRODUCTS);
 

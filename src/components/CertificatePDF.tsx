@@ -246,10 +246,10 @@ export function CertificatePDF({ result, qrCodeDataUrl, backgroundImage, customT
     year: "numeric",
   });
 
-  // Calculate validity date if validityDays is set
-  const validityDays = customTemplate?.validityDays;
+  // Calculate validity date (default 365 days if not set)
+  const validityDays = customTemplate?.validityDays ?? 365;
   let validityText: string | null = null;
-  if (validityDays && validityDays > 0) {
+  if (validityDays > 0) {
     const validUntil = new Date(date);
     validUntil.setDate(validUntil.getDate() + validityDays);
     validityText = `Valid until ${validUntil.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}`;

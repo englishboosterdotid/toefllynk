@@ -1,15 +1,49 @@
 export const dynamic = "force-dynamic";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/services/authService";
-import { Copy, ExternalLink, Trash2, DollarSign, ShoppingCart, Package } from "lucide-react";
+import { Copy, ExternalLink, Trash2, DollarSign, ShoppingCart, Package, TrendingUp, Users } from "lucide-react";
 
 export default async function MyAffiliateLinksPage() {
   const user = await getCurrentUser();
 
   const links = await prisma.affiliateEnrollment.findMany({
     where: { affiliateUserId: user?.id },
-    include: { product: true },
+    include: {
+      product: {
+        include: { settings: true },
+      },
+    },
     orderBy: { createdAt: "desc" },
+  });
+
+  // Get affiliate sales data
+  const affiliateConversions = await prisma.affiliateConversion.findMany({
+    where: { affiliateUserId: user?.id },
+    select: {
+      commissionAmount: true,
+      createdAt: true,
+      order: {
+        select: {
+          id: true,
+          buyerName: true,
+          product: {
+            select: {
+              title: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  // Calculate stats
+  const totalSales = affiliateConversions.length;
+  const totalCommission = affiliateConversions.reduce((sum, c) => sum + c.commissionAmount, 0);
+
+  // Get unique products count
+  const productIds = [...new Set(links.map((l) => l.productId))];
+  const totalClicks = await prisma.affiliateClick.count({
+    where: { referralCode: { in: links.map((l) => l.referralCode) } },
   });
 
   const micrositeUrl = `${process.env.NEXT_PUBLIC_APP_URL || ""}/${user?.username}`;
@@ -30,7 +64,7 @@ export default async function MyAffiliateLinksPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-2xl border border-slate-200 p-6">
           <div className="flex items-start justify-between">
             <div className="bg-purple-50 rounded-xl p-3">
@@ -45,13 +79,25 @@ export default async function MyAffiliateLinksPage() {
 
         <div className="bg-white rounded-2xl border border-slate-200 p-6">
           <div className="flex items-start justify-between">
+            <div className="bg-blue-50 rounded-xl p-3">
+              <TrendingUp className="h-6 w-6 text-blue-600" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <p className="text-sm text-slate-500">Total Clicks</p>
+            <p className="text-3xl font-bold text-slate-900">{totalClicks}</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-start justify-between">
             <div className="bg-green-50 rounded-xl p-3">
               <ShoppingCart className="h-6 w-6 text-green-600" />
             </div>
           </div>
           <div className="mt-4">
             <p className="text-sm text-slate-500">Total Sales</p>
-            <p className="text-3xl font-bold text-slate-900">0</p>
+            <p className="text-3xl font-bold text-slate-900">{totalSales}</p>
           </div>
         </div>
 
@@ -63,7 +109,7 @@ export default async function MyAffiliateLinksPage() {
           </div>
           <div className="mt-4">
             <p className="text-sm text-slate-500">Commission Earned</p>
-            <p className="text-3xl font-bold text-slate-900">Rp 0</p>
+            <p className="text-3xl font-bold text-slate-900">Rp {totalCommission.toLocaleString("id-ID")}</p>
           </div>
         </div>
       </div>
@@ -87,7 +133,7 @@ export default async function MyAffiliateLinksPage() {
         ) : (
           links.map((link) => {
             const referralUrl = `${process.env.NEXT_PUBLIC_APP_URL || ""}/ref/${link.referralCode}/${link.productId}`;
-            const isActive = !link.product.isArchived;
+            const isActive = !link.product.settings?.isArchived;
 
             return (
               <div key={link.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -115,7 +161,7 @@ export default async function MyAffiliateLinksPage() {
                       </div>
                       <div className="mt-4 flex items-center gap-4">
                         <p className="text-2xl font-bold text-slate-900">
-                          Rp {(link.product.promoPrice || link.product.price).toLocaleString("id-ID")}
+                          Rp {(link.product.settings?.promoPrice || link.product.price).toLocaleString("id-ID")}
                         </p>
                       </div>
                     </div>

@@ -35,11 +35,16 @@ export default async function AdminSubscriptionsPage() {
       email: true,
       username: true,
       avatar: true,
-      sellerTier: true,
+      profile: {
+        select: { sellerTier: true },
+      },
     },
   });
 
-  const userMap = new Map(users.map((u) => [u.id, u]));
+  const userMap = new Map(users.map((u) => [u.id, {
+    ...u,
+    sellerTier: u.profile?.sellerTier || "FREE" as SellerTier,
+  }]));
 
   // Stats
   const stats = {
@@ -50,9 +55,9 @@ export default async function AdminSubscriptionsPage() {
   };
 
   const tierStats = {
-    FREE: users.filter((u) => u.sellerTier === "FREE").length,
-    PRO: users.filter((u) => u.sellerTier === "PRO").length,
-    BUSINESS: users.filter((u) => u.sellerTier === "BUSINESS").length,
+    FREE: users.filter((u) => (u.profile?.sellerTier || "FREE") === "FREE").length,
+    PRO: users.filter((u) => u.profile?.sellerTier === "PRO").length,
+    BUSINESS: users.filter((u) => u.profile?.sellerTier === "BUSINESS").length,
   };
 
   const formatCurrency = (amount: number) => {

@@ -1,6 +1,7 @@
 import { login } from "@/lib/services/authService";
 import { loginSchema } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
+import prisma from "@/lib/prisma";
 
 export async function POST(req: Request) {
   try {
@@ -24,6 +25,24 @@ export async function POST(req: Request) {
     }
 
     const { email, password } = validation.data;
+
+    // Check if user exists and email is verified
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { emailVerified: true },
+    });
+
+    if (user && !user.emailVerified) {
+      return Response.json(
+        {
+          success: false,
+          message: "Email belum diverifikasi. Silakan cek email untuk link verifikasi.",
+          needsVerification: true
+        },
+        { status: 403 }
+      );
+    }
+
     const result = await login(email, password);
 
     if (!result.success) {

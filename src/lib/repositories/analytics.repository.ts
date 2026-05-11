@@ -135,13 +135,13 @@ export class AnalyticsRepository extends BaseRepository {
         status: "COMPLETED",
         ...(dateFilter && { createdAt: dateFilter }),
       },
-      select: {
-        product: { select: { promoPrice: true, price: true } },
+      include: {
+        product: { select: { price: true }, include: { settings: { select: { promoPrice: true } } } },
       },
     });
 
     const totalRevenue = completedOrders.reduce((sum, o) => {
-      return sum + (o.product.promoPrice || o.product.price);
+      return sum + (o.product.settings?.promoPrice || o.product.price);
     }, 0);
 
     const completedCount = completedOrdersAgg._count;
@@ -170,10 +170,10 @@ export class AnalyticsRepository extends BaseRepository {
         status: "COMPLETED",
         createdAt: { gte: startDate, lte: endDate },
       },
-      select: {
-        createdAt: true,
+      include: {
         product: {
-          select: { promoPrice: true, price: true },
+          select: { price: true },
+          include: { settings: { select: { promoPrice: true } } },
         },
       },
     });
@@ -201,7 +201,7 @@ export class AnalyticsRepository extends BaseRepository {
           key = date.toISOString().split("T")[0];
       }
 
-      const price = order.product.promoPrice || order.product.price;
+      const price = order.product.settings?.promoPrice || order.product.price;
       revenueByPeriod[key] = (revenueByPeriod[key] || 0) + price;
     });
 

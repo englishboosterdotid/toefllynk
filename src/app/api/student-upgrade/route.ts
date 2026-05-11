@@ -60,8 +60,12 @@ export async function POST(req: Request) {
       username,
       email: studentAccount.buyerEmail,
       password: hashed,
-      whatsapp: studentAccount.buyerWhatsapp || null,
-      headline: `Official TOEFL Partner of ${studentAccount.buyerName}`,
+      profile: {
+        create: {
+          whatsapp: studentAccount.buyerWhatsapp || null,
+          headline: `Official TOEFL Partner of ${studentAccount.buyerName}`,
+        },
+      },
     },
   });
 

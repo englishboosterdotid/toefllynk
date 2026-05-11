@@ -1,0 +1,192 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      skip_migration:
+        description: 'Skip database migration'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run type-check || true
+
+      - name: Build application
+        env:
+          NODE_ENV: production
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: |
+            .next/
+            build/
+            public/
+            package.json
+            package-lock.json
+            node_modules/
+            prisma/
+            src/generated/
+          retention-days: 1
+
+      - name: Setup SSH Key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add server to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SERVER_HOST_KEY }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Deploy to server
+        env:
+          SKIP_MIGRATION: ${{ github.event.inputs.skip_migration || 'false' }}
+        run: |
+          echo "Starting deployment..."
+
+          # Get build artifacts
+          DOWNLOAD_URL=$(curl -s -X GET https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts | grep -o '"archive_download_url":"[^"]*build[^"]*"' | head -1 | cut -d'"' -f4)
+
+          # Create temp directory on server
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.SERVER_IP }} "mkdir -p /tmp/toefllynk_build"
+
+          # Upload build via tar
+          tar -czf - .next build public prisma src/generated package.json package-lock.json node_modules/.prisma 2>/dev/null | \
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.SERVER_IP }} "cat > /tmp/toefllynk_build/build.tar.gz"
+
+          # Full deployment script
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.SERVER_IP }} << 'ENDSSH'
+            set -e
+
+            APP_DIR="${{ secrets.SERVER_APP_DIR }}"
+            DOMAIN="${{ secrets.SERVER_DOMAIN }}"
+
+            echo "=== Deployment to $DOMAIN ==="
+
+            # Backup current .env if exists
+            if [ -f "$APP_DIR/.env" ]; then
+              cp $APP_DIR/.env $APP_DIR/.env.backup
+              echo "Backed up current .env"
+            fi
+
+            # Extract build files
+            echo "Extracting build files..."
+            mkdir -p $APP_DIR
+            tar -xzf /tmp/toefllynk_build/build.tar.gz -C $APP_DIR
+
+            # Restore .env from backup
+            if [ -f "$APP_DIR/.env.backup" ]; then
+              mv $APP_DIR/.env.backup $APP_DIR/.env
+              echo "Restored .env"
+            fi
+
+            # Check/create .env
+            if [ ! -f "$APP_DIR/.env" ] && [ -f "$APP_DIR/.env.example" ]; then
+              cp $APP_DIR/.env.example $APP_DIR/.env
+              echo "Created .env from example - PLEASE UPDATE!"
+            fi
+
+            cd $APP_DIR
+
+            # Generate Prisma client
+            echo "Generating Prisma client..."
+            docker run --rm -v $APP_DIR:/app -w /app node:20 npx prisma generate || true
+
+            # Run migration if not skipped
+            if [ "$SKIP_MIGRATION" != "true" ]; then
+              echo "Running database migration..."
+              docker-compose run --rm -T app npx prisma migrate deploy || \
+              docker-compose run --rm -T app npx prisma db push || true
+            fi
+
+            # Stop and remove old containers
+            echo "Stopping old containers..."
+            docker-compose down || true
+
+            # Build and start new containers
+            echo "Building and starting containers..."
+            docker-compose up -d --build
+
+            # Wait for app to be ready
+            echo "Waiting for app to start..."
+            sleep 15
+
+            # Check status
+            docker-compose ps
+
+            # Health check
+            if curl -f -s http://localhost:3000 > /dev/null 2>&1; then
+              echo "✅ App is responding!"
+            else
+              echo "⚠️ App may not be ready yet. Check logs with: docker-compose logs -f"
+            fi
+
+            # Cleanup
+            rm -rf /tmp/toefllynk_build
+            docker image prune -f
+
+            echo "=== Deployment complete! ==="
+          ENDSSH
+
+      - name: Verify deployment
+        run: |
+          echo "Checking deployment status..."
+          sleep 5
+
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://${{ secrets.SERVER_DOMAIN }}/ 2>/dev/null || \
+                   curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.SERVER_IP }}/ 2>/dev/null || echo "000")
+
+          if [ "$STATUS" == "200" ] || [ "$STATUS" == "301" ] || [ "$STATUS" == "302" ]; then
+            echo "✅ App responding with status: $STATUS"
+          else
+            echo "⚠️ App responded with status: $STATUS"
+            echo "Please check manually: ssh root@${{ secrets.SERVER_IP }}"
+            echo "Then run: cd ${{ secrets.SERVER_APP_DIR }} && docker-compose logs -f"
+          fi
+
+      - name: Deployment notification
+        if: always()
+        run: |
+          echo ""
+          echo "========================================"
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ DEPLOYMENT SUCCESSFUL"
+            echo "🌐 App: https://${{ secrets.SERVER_DOMAIN }}"
+          else
+            echo "❌ DEPLOYMENT FAILED"
+            echo ""
+            echo "To debug:"
+            echo "1. SSH: ssh root@${{ secrets.SERVER_IP }}"
+            echo "2. Check logs: cd ${{ secrets.SERVER_APP_DIR }} && docker-compose logs -f"
+            echo "3. Restart: cd ${{ secrets.SERVER_APP_DIR }} && docker-compose restart"
+          fi
+          echo "========================================"

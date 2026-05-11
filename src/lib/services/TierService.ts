@@ -345,7 +345,7 @@ class TierServiceClass {
     return null;
   }
 
-  static getEffectiveFee(user: { sellerTier: SellerTier; customFeeRate: number | null }): number {
+  static getEffectiveFee(user: { sellerTier: SellerTier; customFeeRate: number | null | undefined }): number {
     if (user.customFeeRate !== null && user.customFeeRate !== undefined) {
       return Math.max(0, Math.min(20, user.customFeeRate));
     }
@@ -398,8 +398,8 @@ class TierServiceClass {
   // ============ INSTANCE METHODS ============
 
   async checkProductLimit(userId: string): Promise<ProductLimitResult> {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    const profile = await prisma.sellerProfile.findUnique({
+      where: { userId },
       select: {
         sellerTier: true,
         customFeeRate: true,
@@ -407,38 +407,54 @@ class TierServiceClass {
       },
     });
 
-    if (!user) {
-      throw new Error("User not found");
+    const sellerTier = profile?.sellerTier || "FREE";
+    const subscriptionEnd = profile?.subscriptionEnd;
+    const customFeeRate = profile?.customFeeRate;
+
+    if (!profile) {
+      // User has no seller profile, treat as FREE tier
+      const productCount = await productRepository.countByUser(userId);
+      const tierConfig = TierServiceClass.getConfig("FREE");
+
+      // Check product limit for FREE tier
+      const canCreate = productCount < tierConfig.maxProducts;
+
+      return {
+        canCreate,
+        productCount,
+        maxProducts: tierConfig.maxProducts,
+        maxMicrositeProducts: tierConfig.maxMicrositeProducts,
+        isUnlimited: false,
+        currentTier: "FREE" as SellerTier,
+        effectiveFeeRate: tierConfig.platformFee,
+      };
     }
 
     const productCount = await productRepository.countByUser(userId);
-
-    const tierConfig = TierServiceClass.getConfig(user.sellerTier);
-    const maxProducts = tierConfig.maxProducts;
-    const maxMicrositeProducts = tierConfig.maxMicrositeProducts;
+    const tierConfig = TierServiceClass.getConfig(sellerTier);
     const isUnlimited = tierConfig.isUnlimited;
-    const effectiveFeeRate = TierServiceClass.getEffectiveFee(user);
+    const effectiveFeeRate = TierServiceClass.getEffectiveFee({ sellerTier, customFeeRate });
 
-    if (!TierServiceClass.isSubscriptionValid(user.subscriptionEnd, user.sellerTier) && user.sellerTier !== "FREE") {
+    if (!TierServiceClass.isSubscriptionValid(subscriptionEnd ?? null, sellerTier) && sellerTier !== "FREE") {
       return {
         canCreate: false,
         productCount,
-        maxProducts,
-        maxMicrositeProducts,
+        maxProducts: tierConfig.maxProducts,
+        maxMicrositeProducts: tierConfig.maxMicrositeProducts,
         isUnlimited,
-        currentTier: user.sellerTier,
+        currentTier: sellerTier,
         effectiveFeeRate,
       };
     }
 
-    if (!isUnlimited && productCount >= maxProducts) {
+    if (!isUnlimited && productCount >= tierConfig.maxProducts) {
       return {
         canCreate: false,
         productCount,
-        maxProducts,
-        maxMicrositeProducts,
+        maxProducts: tierConfig.maxProducts,
+        maxMicrositeProducts: tierConfig.maxMicrositeProducts,
         isUnlimited,
-        currentTier: user.sellerTier,
+        currentTier: sellerTier,
         effectiveFeeRate,
       };
     }
@@ -446,28 +462,37 @@ class TierServiceClass {
     return {
       canCreate: true,
       productCount,
-      maxProducts,
-      maxMicrositeProducts,
+      maxProducts: tierConfig.maxProducts,
+      maxMicrositeProducts: tierConfig.maxMicrositeProducts,
       isUnlimited,
-      currentTier: user.sellerTier,
+      currentTier: sellerTier,
       effectiveFeeRate,
     };
   }
 
   async checkMicrositeProductLimit(userId: string): Promise<MicrositeProductLimitResult> {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    const profile = await prisma.sellerProfile.findUnique({
+      where: { userId },
       select: {
         sellerTier: true,
         subscriptionEnd: true,
       },
     });
 
-    if (!user) {
-      throw new Error("User not found");
+    const sellerTier = profile?.sellerTier || "FREE";
+
+    if (!profile) {
+      const tierConfig = TierServiceClass.getConfig("FREE");
+      return {
+        canShow: true,
+        visibleCount: 0,
+        maxVisible: tierConfig.maxMicrositeProducts,
+        isUnlimited: tierConfig.isUnlimited,
+        currentTier: "FREE" as SellerTier,
+      };
     }
 
-    const tierConfig = TierServiceClass.getConfig(user.sellerTier);
+    const tierConfig = TierServiceClass.getConfig(sellerTier);
     const maxMicrositeProducts = tierConfig.maxMicrositeProducts;
     const isUnlimited = maxMicrositeProducts === -1;
 
@@ -479,7 +504,7 @@ class TierServiceClass {
         visibleCount,
         maxVisible: maxMicrositeProducts,
         isUnlimited,
-        currentTier: user.sellerTier,
+        currentTier: sellerTier,
       };
     }
 
@@ -488,7 +513,7 @@ class TierServiceClass {
       visibleCount,
       maxVisible: maxMicrositeProducts,
       isUnlimited,
-      currentTier: user.sellerTier,
+      currentTier: sellerTier,
     };
   }
 
@@ -502,20 +527,18 @@ class TierServiceClass {
       extendDays?: number;
     }
   ): Promise<TierChangeResult> {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    const profile = await prisma.sellerProfile.findUnique({
+      where: { userId },
       select: {
         sellerTier: true,
         subscriptionEnd: true,
+        subscriptionStart: true,
       },
     });
 
-    if (!user) {
-      throw new Error("User not found");
-    }
+    const oldTier = profile?.sellerTier || "FREE";
 
-    const oldTier = user.sellerTier;
-
+    // Upsert profile with new tier info
     const updateData: Record<string, unknown> = {
       sellerTier: newTier,
       tierChangedAt: new Date(),
@@ -530,19 +553,20 @@ class TierServiceClass {
     }
 
     if (options?.extendDays) {
-      const currentEnd = user.subscriptionEnd || new Date();
+      const currentEnd = profile?.subscriptionEnd || new Date();
       const newEnd = new Date(currentEnd);
       newEnd.setDate(newEnd.getDate() + options.extendDays);
       updateData.subscriptionEnd = newEnd;
 
-      if (!user.subscriptionEnd) {
+      if (!profile?.subscriptionEnd) {
         updateData.subscriptionStart = new Date();
       }
     }
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: updateData,
+    await prisma.sellerProfile.upsert({
+      where: { userId },
+      create: { userId, ...updateData } as any,
+      update: updateData,
     });
 
     await this.logTierChange({
@@ -576,8 +600,8 @@ class TierServiceClass {
   }
 
   async getUserTierInfo(userId: string): Promise<UserTierInfo> {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    const profile = await prisma.sellerProfile.findUnique({
+      where: { userId },
       select: {
         sellerTier: true,
         customFeeRate: true,
@@ -585,25 +609,47 @@ class TierServiceClass {
       },
     });
 
-    if (!user) {
-      throw new Error("User not found");
+    const sellerTier = profile?.sellerTier || "FREE";
+    const customFeeRate = profile?.customFeeRate;
+    const subscriptionEnd = profile?.subscriptionEnd;
+
+    if (!profile) {
+      const tierConfig = TierServiceClass.getConfig("FREE");
+      return {
+        tier: "FREE" as SellerTier,
+        tierConfig,
+        effectiveFeeRate: tierConfig.platformFee,
+        withdrawalFeeRate: tierConfig.withdrawalFee,
+        maxProducts: tierConfig.maxProducts,
+        maxMicrositeProducts: tierConfig.maxMicrositeProducts,
+        isUnlimited: tierConfig.isUnlimited,
+        productCount: 0,
+        micrositeVisibleCount: 0,
+        productsUsed: 0,
+        subscriptionStatus: "NONE",
+        subscriptionEnd: null,
+        daysUntilExpiry: null,
+        customFeeRate: null,
+        canUpgrade: TierServiceClass.getNextTier("FREE") !== null,
+        upgradeTo: TierServiceClass.getNextTier("FREE"),
+      };
     }
 
     const productCount = await productRepository.countByUser(userId);
     const micrositeVisibleCount = await productRepository.countVisibleOnMicrosite(userId);
 
-    const tierConfig = TierServiceClass.getConfig(user.sellerTier);
-    const effectiveFeeRate = TierServiceClass.getEffectiveFee(user);
-    const isExpired = TierServiceClass.isExpired(user.subscriptionEnd);
-    const daysUntilExpiry = TierServiceClass.getDaysUntilExpiry(user.subscriptionEnd);
+    const tierConfig = TierServiceClass.getConfig(sellerTier);
+    const effectiveFeeRate = TierServiceClass.getEffectiveFee({ sellerTier, customFeeRate });
+    const isExpired = TierServiceClass.isExpired(subscriptionEnd ?? null);
+    const daysUntilExpiry = TierServiceClass.getDaysUntilExpiry(subscriptionEnd ?? null);
 
     let subscriptionStatus: "ACTIVE" | "EXPIRED" | "GRACE_PERIOD" | "NONE" = "NONE";
-    if (user.sellerTier === "FREE") {
+    if (sellerTier === "FREE") {
       subscriptionStatus = "NONE";
     } else if (isExpired) {
       subscriptionStatus = "EXPIRED";
-    } else if (user.subscriptionEnd) {
-      const daysLeft = TierServiceClass.getDaysUntilExpiry(user.subscriptionEnd);
+    } else if (subscriptionEnd) {
+      const daysLeft = TierServiceClass.getDaysUntilExpiry(subscriptionEnd);
       if (daysLeft !== null && daysLeft <= GRACE_PERIOD_DAYS) {
         subscriptionStatus = "GRACE_PERIOD";
       } else {
@@ -611,10 +657,10 @@ class TierServiceClass {
       }
     }
 
-    const upgradeTo = TierServiceClass.getNextTier(user.sellerTier);
+    const upgradeTo = TierServiceClass.getNextTier(sellerTier);
 
     return {
-      tier: user.sellerTier,
+      tier: sellerTier,
       tierConfig,
       effectiveFeeRate,
       withdrawalFeeRate: tierConfig.withdrawalFee,
@@ -625,9 +671,9 @@ class TierServiceClass {
       micrositeVisibleCount,
       productsUsed: productCount,
       subscriptionStatus,
-      subscriptionEnd: user.subscriptionEnd,
-      daysUntilExpiry,
-      customFeeRate: user.customFeeRate,
+      subscriptionEnd: subscriptionEnd ?? null,
+      daysUntilExpiry: daysUntilExpiry ?? null,
+      customFeeRate: customFeeRate ?? null,
       canUpgrade: upgradeTo !== null,
       upgradeTo,
     };
@@ -639,16 +685,13 @@ class TierServiceClass {
     userId: string,
     feature: keyof TierConfig
   ): Promise<FeatureAccessResult> {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    const profile = await prisma.sellerProfile.findUnique({
+      where: { userId },
       select: { sellerTier: true },
     });
 
-    if (!user) {
-      return { hasAccess: false };
-    }
-
-    const tierConfig = TierServiceClass.getConfig(user.sellerTier);
+    const sellerTier = profile?.sellerTier || "FREE";
+    const tierConfig = TierServiceClass.getConfig(sellerTier);
     const featureValue = tierConfig[feature];
 
     if (typeof featureValue === "boolean") {

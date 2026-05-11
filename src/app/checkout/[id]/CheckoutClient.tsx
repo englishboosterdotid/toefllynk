@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Shield, Package, CheckCircle2 } from "lucide-react";
+import { AffiliateTracker } from "@/components/AffiliateTracker";
 
 declare global {
   interface Window {
@@ -175,6 +176,9 @@ export default function CheckoutClient({ product, referral }: CheckoutClientProp
 
   return (
     <main className="min-h-screen bg-slate-50/50 py-12 px-4">
+      {/* Track affiliate click */}
+      {referral && <AffiliateTracker referralCode={referral} productId={product.id} />}
+
       <div className="max-w-xl mx-auto">
         {/* Back button */}
         <Link

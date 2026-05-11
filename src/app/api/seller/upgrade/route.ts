@@ -34,9 +34,9 @@ export async function POST(req: Request) {
     const currentUser = await prisma.user.findUnique({
       where: { id: user.id },
       select: {
-        sellerTier: true,
         email: true,
         name: true,
+        profile: { select: { sellerTier: true } },
       },
     });
 
@@ -47,8 +47,10 @@ export async function POST(req: Request) {
       );
     }
 
+    const currentTier = currentUser.profile?.sellerTier || "FREE";
+
     // Check if trying to downgrade
-    if (TierServiceClass.getRank(targetTier) <= TierServiceClass.getRank(currentUser.sellerTier)) {
+    if (TierServiceClass.getRank(targetTier) <= TierServiceClass.getRank(currentTier)) {
       return NextResponse.json(
         { success: false, message: "Tidak bisa downgrade tier" },
         { status: 400 }

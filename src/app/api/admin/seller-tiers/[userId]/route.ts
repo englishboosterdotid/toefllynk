@@ -23,18 +23,22 @@ export async function GET(
         email: true,
         username: true,
         avatar: true,
-        whatsapp: true,
-        sellerTier: true,
-        subscriptionStart: true,
-        subscriptionEnd: true,
-        customFeeRate: true,
-        tierChangedAt: true,
-        tierChangeReason: true,
         createdAt: true,
+        profile: {
+          select: {
+            whatsapp: true,
+            sellerTier: true,
+            subscriptionStart: true,
+            subscriptionEnd: true,
+            customFeeRate: true,
+            tierChangedAt: true,
+            tierChangeReason: true,
+          },
+        },
         _count: {
           select: {
             products: {
-              where: { isArchived: false },
+              where: { settings: { isArchived: false } },
             },
           },
         },
@@ -49,7 +53,8 @@ export async function GET(
     }
 
     // Get tier info
-    const tierInfo = TierServiceClass.getConfig(user.sellerTier);
+    const sellerTier = user.profile?.sellerTier || "FREE";
+    const tierInfo = TierServiceClass.getConfig(sellerTier);
 
     // Get tier change history
     const tierHistory = await prisma.sellerTierLog.findMany({
@@ -80,15 +85,15 @@ export async function GET(
           email: user.email,
           username: user.username,
           avatar: user.avatar,
-          whatsapp: user.whatsapp,
-          sellerTier: user.sellerTier,
-          subscriptionStart: user.subscriptionStart,
-          subscriptionEnd: user.subscriptionEnd,
-          customFeeRate: user.customFeeRate,
-          tierChangedAt: user.tierChangedAt,
-          tierChangeReason: user.tierChangeReason,
+          whatsapp: user.profile?.whatsapp,
+          sellerTier,
+          subscriptionStart: user.profile?.subscriptionStart,
+          subscriptionEnd: user.profile?.subscriptionEnd,
+          customFeeRate: user.profile?.customFeeRate,
+          tierChangedAt: user.profile?.tierChangedAt,
+          tierChangeReason: user.profile?.tierChangeReason,
           createdAt: user.createdAt,
-          productCount: (user as any)._count?.products || 0,
+          productCount: user._count.products,
         },
         tierInfo,
         tierHistory,
@@ -124,7 +129,12 @@ export async function PATCH(
     // Validate user exists
     const targetUser = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, name: true, sellerTier: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        profile: { select: { sellerTier: true } },
+      },
     });
 
     if (!targetUser) {

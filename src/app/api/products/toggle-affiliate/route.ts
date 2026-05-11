@@ -11,18 +11,19 @@ export async function POST(req: Request) {
 
     const product = await prisma.product.findUnique({
       where: { id: productId },
-      select: { userId: true, affiliateEnabled: true },
+      include: { settings: { select: { affiliateEnabled: true } } },
     });
 
     if (!product || product.userId !== user.id) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 403 });
     }
 
-    await prisma.product.update({
-      where: { id: productId },
-      data: { affiliateEnabled: !product.affiliateEnabled },
+    await prisma.productSettings.upsert({
+      where: { productId },
+      create: { productId, affiliateEnabled: true },
+      update: { affiliateEnabled: !product.settings?.affiliateEnabled },
     });
-    
+
     // Invalidate products cache
     cache.delete(CacheKeys.PRODUCTS);
 

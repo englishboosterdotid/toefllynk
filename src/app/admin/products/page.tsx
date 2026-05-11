@@ -11,6 +11,13 @@ export default async function ProductsPage() {
       _count: {
         select: { orders: true },
       },
+      settings: {
+        select: {
+          isArchived: true,
+          promoPrice: true,
+          examCredits: true,
+        },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -82,11 +89,11 @@ export default async function ProductsPage() {
                   <div className="flex items-start justify-between mb-2">
                     <h3 className="font-semibold text-slate-900 line-clamp-1">{product.title}</h3>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      !product.isArchived
+                      !product.settings?.isArchived
                         ? "bg-green-100 text-green-700"
                         : "bg-slate-100 text-slate-600"
                     }`}>
-                      {!product.isArchived ? "Active" : "Archived"}
+                      {!product.settings?.isArchived ? "Active" : "Archived"}
                     </span>
                   </div>
 
@@ -94,10 +101,10 @@ export default async function ProductsPage() {
 
                   {/* Price */}
                   <div className="flex items-center gap-3 mb-4">
-                    {product.promoPrice && product.promoPrice < product.price ? (
+                    {product.settings?.promoPrice && product.settings.promoPrice < product.price ? (
                       <>
                         <span className="text-xl font-bold text-blue-600">
-                          Rp {product.promoPrice.toLocaleString("id-ID")}
+                          Rp {product.settings.promoPrice.toLocaleString("id-ID")}
                         </span>
                         <span className="text-sm text-slate-400 line-through">
                           Rp {product.price.toLocaleString("id-ID")}
@@ -116,7 +123,7 @@ export default async function ProductsPage() {
                       <span className="font-medium text-slate-700">{product._count.orders}</span> orders
                     </div>
                     <div className="text-sm text-slate-500">
-                      <span className="font-medium text-slate-700">{product.examCredits}</span> credits
+                      <span className="font-medium text-slate-700">{product.settings?.examCredits ?? 1}</span> credits
                     </div>
                   </div>
 

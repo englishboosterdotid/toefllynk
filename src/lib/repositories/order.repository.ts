@@ -17,10 +17,11 @@ const SELECT_ORDER_WITH_DETAILS = {
       id: true,
       title: true,
       price: true,
-      promoPrice: true,
-      examCredits: true,
       user: {
         select: { id: true, name: true, username: true },
+      },
+      settings: {
+        select: { promoPrice: true },
       },
     },
   },
@@ -59,7 +60,9 @@ const SELECT_ORDER_BASIC = {
       id: true,
       title: true,
       price: true,
-      promoPrice: true,
+      settings: {
+        select: { promoPrice: true },
+      },
     },
   },
 } as const;
@@ -211,9 +214,8 @@ export class OrderRepository extends BaseRepository {
             id: true,
             title: true,
             price: true,
-            promoPrice: true,
-            examCredits: true,
-            user: { select: { id: true, sellerTier: true } },
+            user: { select: { id: true, name: true, username: true } },
+            settings: { select: { promoPrice: true, examCredits: true } },
           },
         },
         student: {
@@ -285,13 +287,16 @@ export class OrderRepository extends BaseRepository {
       select: {
         id: true,
         product: {
-          select: { promoPrice: true, price: true },
+          select: {
+            price: true,
+            settings: { select: { promoPrice: true } },
+          },
         },
       },
     });
 
     return orders.reduce((sum, order) => {
-      const price = order.product.promoPrice || order.product.price;
+      const price = order.product.settings?.promoPrice || order.product.price;
       return sum + price;
     }, 0);
   }

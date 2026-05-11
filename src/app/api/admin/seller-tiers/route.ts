@@ -17,16 +17,17 @@ export async function GET(req: Request) {
 
     const whereClause: any = {};
 
-    if (tier && ["FREE", "BASIC", "PRO", "BUSINESS"].includes(tier)) {
-      whereClause.sellerTier = tier;
-    }
-
     if (search) {
       whereClause.OR = [
         { name: { contains: search, mode: "insensitive" } },
         { email: { contains: search, mode: "insensitive" } },
         { username: { contains: search, mode: "insensitive" } },
       ];
+    }
+
+    // Add profile filter for tier if specified
+    if (tier && ["FREE", "BASIC", "PRO", "BUSINESS"].includes(tier)) {
+      whereClause.profile = { sellerTier: tier };
     }
 
     const [users, total, tierCounts] = await Promise.all([
@@ -41,23 +42,27 @@ export async function GET(req: Request) {
           email: true,
           username: true,
           avatar: true,
-          sellerTier: true,
-          subscriptionStart: true,
-          subscriptionEnd: true,
-          customFeeRate: true,
-          tierChangedAt: true,
           createdAt: true,
+          profile: {
+            select: {
+              sellerTier: true,
+              subscriptionStart: true,
+              subscriptionEnd: true,
+              customFeeRate: true,
+              tierChangedAt: true,
+            },
+          },
           _count: {
             select: {
               products: {
-                where: { isArchived: false },
+                where: { settings: { isArchived: false } },
               },
             },
           },
         },
       }),
       prisma.user.count({ where: whereClause }),
-      prisma.user.groupBy({
+      prisma.sellerProfile.groupBy({
         by: ["sellerTier"],
         _count: { sellerTier: true },
       }),
@@ -67,6 +72,7 @@ export async function GET(req: Request) {
     const tierDistribution = {
       FREE: 0,
       BASIC: 0,
+      STARTER: 0,
       PRO: 0,
       BUSINESS: 0,
     };
@@ -78,9 +84,18 @@ export async function GET(req: Request) {
     return NextResponse.json({
       success: true,
       sellers: users.map((user) => ({
-        ...user,
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        username: user.username,
+        avatar: user.avatar,
+        createdAt: user.createdAt,
+        sellerTier: user.profile?.sellerTier || "FREE",
+        subscriptionStart: user.profile?.subscriptionStart,
+        subscriptionEnd: user.profile?.subscriptionEnd,
+        customFeeRate: user.profile?.customFeeRate,
+        tierChangedAt: user.profile?.tierChangedAt,
         productCount: user._count.products,
-        _count: undefined,
       })),
       pagination: {
         page,
